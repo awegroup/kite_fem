@@ -12,7 +12,7 @@ Lc = L0 # Initial length of the spring (m)
 # Node 1 is fixed at the origin
 p1_initial = np.array([0.0, 0.0, 0.0])
 # Node 2 initial position
-p2_initial = np.array([15.0, -10, 2.0])
+p2_initial = np.array([1, 3,0])
 
 # Applied external force at Node 2
 F_ext_node2 = np.array([1.0, 1.0, 0.0]) # (Fx, Fy, Fz)
@@ -54,7 +54,7 @@ p1_current = np.copy(p1_initial)
 p2_current = np.copy(p2_initial) # Current position of Node 2, starts at initial
 
 # Solver parameters
-num_iterations = 50
+num_iterations = 8
 tolerance = 1e-8
 under_relaxation =1 # Can help with convergence for some problems
 

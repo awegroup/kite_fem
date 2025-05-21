@@ -66,7 +66,7 @@ def setup_truss_element():
     # Boundary conditions: fix node 0 (all DOFs), fix node 1 in y
     bk = np.zeros(N, dtype=bool)
     bk[:3] = True  # Node 0: all DOFs
-    bk[DOF] = True  # Node 1: y DOF
+    bk[DOF+1] = True  # Node 1: y DOF
     bu = ~bk
 
     # Force vector: apply F in x and y at node 2

@@ -6,7 +6,7 @@ from scipy.sparse import coo_matrix
 from pyfe3d.beamprop import BeamProp
 from pyfe3d import BeamLR, BeamLRData, BeamLRProbe, DOF, INT, DOUBLE
 
-n = 10
+n = 50
 L = 10
 P = -5
 
