@@ -2,17 +2,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # --- Element Properties and Problem Definition ---
-E = 5000 # Young's modulus 
+E = 1 # Young's modulus 
 A = 1 # Cross-sectional area 
 L0 = 1.0       # Unstressed length of the spring (m)
 Lc = L0 # Initial length of the spring (m)
-
+k_spring = E * A / L0 # Spring constant (N/m)
 
 # Nodal Coordinates
 # Node 1 is fixed at the origin
 p1_initial = np.array([0.0, 0.0, 0.0])
 # Node 2 initial position
-p2_initial = np.array([1, 3,0])
+p2_initial = np.array([1, 0,0])
 
 # Applied external force at Node 2
 F_ext_node2 = np.array([1.0, 1.0, 0.0]) # (Fx, Fy, Fz)
@@ -54,7 +54,7 @@ p1_current = np.copy(p1_initial)
 p2_current = np.copy(p2_initial) # Current position of Node 2, starts at initial
 
 # Solver parameters
-num_iterations = 8
+num_iterations = 50
 tolerance = 1e-8
 under_relaxation =1 # Can help with convergence for some problems
 
@@ -68,7 +68,7 @@ for i in range(num_iterations):
     # 1. Calculate current geometry
     Lc, dir_cosines = get_current_geometry(p1_current, p2_current)
     cx, cy, cz = dir_cosines[0], dir_cosines[1], dir_cosines[2]
-    k_spring = E * A *Lc**2/ L0**3
+    k_spring_iterate = E * A *Lc**2/ L0**3
     # 2. Calculate internal force in the spring
     P_axial_force = k_spring * (Lc - L0) # Positive for tension
 
@@ -88,7 +88,7 @@ for i in range(num_iterations):
         break
 
     # 6. Form tangent stiffness matrix for Node 2's DOFs
-    Ke_22 = get_elastic_stiffness_Ke22(k_spring, cx, cy, cz)
+    Ke_22 = get_elastic_stiffness_Ke22(k_spring_iterate, cx, cy, cz)
     Kg_22 = get_geometric_stiffness_Kg22(P_axial_force, Lc, cx, cy, cz)
     KT_22 = Ke_22 + Kg_22
 
