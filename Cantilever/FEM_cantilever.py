@@ -21,7 +21,9 @@ A = hy*hz
 Izz = hz*hy**3/12
 Iyy = hz**3*hy/12
 
-EI = 10000
+Load_param = 10
+
+EI = -P*L**2/Load_param
 E = EI/Izz
 
 # print('E', E)
@@ -112,13 +114,13 @@ plt.show()
 
 
 # Print maximum deflections and angle at the tip
-max_deflection_y = np.min(dy)  # Most negative value (downwards)
-max_deflection_x = dx[np.argmin(dy)]  # x-deflection at max y-deflection
-angle_tip = np.arctan2(dy[-1] - dy[-2], x[-1] - x[-2])
+max_deflection_y = -np.min(dy)/L  # Most negative value (downwards)
+max_deflection_x = dx[np.argmin(dy)]/L  # x-deflection at max y-deflection
+angle_tip = -np.arctan2(dy[-1] - dy[-2], x[-1] - x[-2])
 
-print("pL^2/EI:", -P*L**2/(E*Izz))
-print("y:", -max_deflection_y/L)
-print("x:", max_deflection_x/L)
-print("angle:", -angle_tip)
+print(Load_param)
+print(max_deflection_y)
+print(max_deflection_x)
+print(angle_tip)
 
 
