@@ -20,7 +20,8 @@ def import_data(file_name):
 PSM2D = import_data("PSM2D.csv")
 PSM3D = import_data("PSM3D.csv")
 Literature = import_data("Literature.csv")
-FEM_timoshenko = import_data("FEM_timoshenko.csv")
+FEM_timoshenko3 = import_data("FEM_timoshenko3Node.csv")
+FEM_timoshenko5 = import_data("FEM_timoshenko5Node.csv")
 
 PSM2D["L_ratio"] 
 
@@ -42,16 +43,23 @@ fig3, ax3 = plt.subplots(figsize=(6,6))
 for i in range(len(L_ratios)):
     Bool = np.zeros_like(L_ratio,dtype=bool)
     Bool = np.where(L_ratio == L_ratios[i],True,Bool)
-    ax1.scatter(Vertical_disp[Bool],Load_param[Bool], label = f"L_ratio = {L_ratios[i]}",color=colors[i])
-    ax2.scatter(Horizontal_disp[Bool],Load_param[Bool], label = f"L_ratio = {L_ratios[i]}",color=colors[i])
-    ax3.scatter(Beam_angle[Bool],Load_param[Bool], label = f"L_ratio = {L_ratios[i]}",color=colors[i])
+    ax1.plot(Vertical_disp[Bool],Load_param[Bool], label = f"PSM, AR = {L_ratios[i]}",color=colors[i],)
+    ax2.plot(Horizontal_disp[Bool],Load_param[Bool], label = f"PSM, AR = {L_ratios[i]}",color=colors[i])
+    ax3.plot(Beam_angle[Bool],Load_param[Bool], label = f"PSM, AR = {L_ratios[i]}",color=colors[i])
 
-ax1.plot(Literature["Vertical_disp"],Literature["Load_param"], linestyle="--",color=colors[len(L_ratios)],label="Literature")
-ax2.plot(Literature["Horizontal_disp"],Literature["Load_param"], linestyle="--",color=colors[len(L_ratios)],label="Literature")
-ax3.plot(Literature["Beam_angle"],Literature["Load_param"], linestyle="--",color=colors[len(L_ratios)],label="Literature")
+ax1.plot(Literature["Vertical_disp"],Literature["Load_param"], linestyle="-",color="black",label="Mattiasson")
+ax2.plot(Literature["Horizontal_disp"],Literature["Load_param"], linestyle="-",color="black",label="Mattiasson")
+ax3.plot(Literature["Beam_angle"],Literature["Load_param"], linestyle="-",color="black",label="Mattiasson")
 
-ax1.plot(FEM_timoshenko["Vertical_disp"],FEM_timoshenko["Load_param"], linestyle="--",color=colors[len(L_ratios)+1],label="Timoshenko")
-ax3.plot(FEM_timoshenko["Beam_angle"],FEM_timoshenko["Load_param"], linestyle="--",color=colors[len(L_ratios)+1],label="Timoshenko")
+
+
+ax1.plot(FEM_timoshenko3["Vertical_disp"],FEM_timoshenko3["Load_param"], linestyle="--",color="gray",label="Timoshenko, N=3")
+ax3.plot(FEM_timoshenko3["Beam_angle"],FEM_timoshenko3["Load_param"], linestyle="--",color="gray",label="Timoshenko, N=3")
+ax1.plot(FEM_timoshenko5["Vertical_disp"],FEM_timoshenko5["Load_param"], linestyle="--",color="purple",label="Timoshenko, N=5")
+ax3.plot(FEM_timoshenko5["Beam_angle"],FEM_timoshenko5["Load_param"], linestyle="--",color="purple",label="Timoshenko, N=5")
+
+
+
 
 ax1.legend()
 ax1.set_xlabel(f"Non-Dimensional Deflection "+r"$w/L$ [-]")
