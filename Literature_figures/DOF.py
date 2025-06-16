@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from matplotlib.ticker import ScalarFormatter
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 plt.style.use('_mpl-gallery')
@@ -34,6 +36,8 @@ ax.grid(which='both')
 ax.set_xlabel("Degrees of Freedom")
 ax.set_ylim(0.5, len(names) + 0.5)
 ax.set_xscale('log')
+ax.xaxis.set_major_formatter(ScalarFormatter())
+ax.ticklabel_format(style='plain', axis='x')
 
 fig.tight_layout()
 fig.savefig(os.path.join(script_dir,"DOF_comparison.svg"))
