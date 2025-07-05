@@ -240,46 +240,48 @@ def calc_deflection(Load_param, L_ratio, L_side=1,P=5,plot=False):
     return L_ratio, Load_param, Vertical_disp, Horizontal_disp, Beam_angle
 
 if __name__ == "__main__":
-    # Example usage
-    Load_params = [0.5, 1, 2, 3, 4, 5,7.5,10] # [N*m] load parameter
-    L_ratios = [2,7]
-    L_side = 1 # [m] length of the square side
-    P = 5 # [N] force applied at the end of the cantilever
+    # # Example usage
+    # Load_params = [0.5, 1, 2, 3, 4, 5,7.5,10] # [N*m] load parameter
+    # L_ratios = [2,7]
+    # L_side = 1 # [m] length of the square side
+    # P = 5 # [N] force applied at the end of the cantilever
 
-    Load_param_lst = []
-    L_ratio_lst = []
-    Vertical_disp_lst = []
-    Horizontal_disp_lst = []
-    Beam_angle_lst = []
+    # Load_param_lst = []
+    # L_ratio_lst = []
+    # Vertical_disp_lst = []
+    # Horizontal_disp_lst = []
+    # Beam_angle_lst = []
     
-    for L_ratio in L_ratios:
-        print("L_ratio: ", L_ratio)
-        L_ratio_lst.append(L_ratio)
-        Load_param_lst.append(0)
-        Vertical_disp_lst.append(0)
-        Horizontal_disp_lst.append(0)
-        Beam_angle_lst.append(0)
-        for load_param in Load_params:
-            print("Load_param: ", load_param)
-            L_ratio, Load_param, Vertical_disp, Horizontal_disp, Beam_angle = calc_deflection(load_param, L_ratio, L_side, P)
-            L_ratio_lst.append(L_ratio)
-            Load_param_lst.append(Load_param)
-            Vertical_disp_lst.append(Vertical_disp)
-            Horizontal_disp_lst.append(Horizontal_disp)
-            Beam_angle_lst.append(Beam_angle)
+    # for L_ratio in L_ratios:
+    #     print("L_ratio: ", L_ratio)
+    #     L_ratio_lst.append(L_ratio)
+    #     Load_param_lst.append(0)
+    #     Vertical_disp_lst.append(0)
+    #     Horizontal_disp_lst.append(0)
+    #     Beam_angle_lst.append(0)
+    #     for load_param in Load_params:
+    #         print("Load_param: ", load_param)
+    #         L_ratio, Load_param, Vertical_disp, Horizontal_disp, Beam_angle = calc_deflection(load_param, L_ratio, L_side, P)
+    #         L_ratio_lst.append(L_ratio)
+    #         Load_param_lst.append(Load_param)
+    #         Vertical_disp_lst.append(Vertical_disp)
+    #         Horizontal_disp_lst.append(Horizontal_disp)
+    #         Beam_angle_lst.append(Beam_angle)
     
-    df = pd.DataFrame({
-    "L_ratio": L_ratio_lst,
-    "Load_param": Load_param_lst,
-    "Vertical_disp": Vertical_disp_lst,
-    "Horizontal_disp": Horizontal_disp_lst,
-    "Beam_angle": Beam_angle_lst
-    }) 
+    # df = pd.DataFrame({
+    # "L_ratio": L_ratio_lst,
+    # "Load_param": Load_param_lst,
+    # "Vertical_disp": Vertical_disp_lst,
+    # "Horizontal_disp": Horizontal_disp_lst,
+    # "Beam_angle": Beam_angle_lst
+    # }) 
     
-    csv_path = os.path.join(script_dir, 'Results', "PSM2D.csv")
+    # csv_path = os.path.join(script_dir, 'Results', "PSM2D.csv")
 
-    # Append to CSV (create if doesn't exist)
-    if not os.path.isfile(csv_path):
-        df.to_csv(csv_path,  header=True, index=False)
-    else:
-        df.to_csv(csv_path, mode='a', header=False, index=False)
+    # # Append to CSV (create if doesn't exist)
+    # if not os.path.isfile(csv_path):
+    #     df.to_csv(csv_path,  header=True, index=False)
+    # else:
+    #     df.to_csv(csv_path, mode='a', header=False, index=False)
+        
+    L_ratio, Load_param, Vertical_disp, Horizontal_disp, Beam_angle = calc_deflection(1, 5, 1, 2,plot=True)

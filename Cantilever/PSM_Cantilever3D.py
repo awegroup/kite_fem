@@ -24,8 +24,8 @@ params = {
 
 
 
-P = 5 # [N] force applied at the end of the cantilever 
-P_Angle = 20   # [deg] angle of the force, 0 deg is in the y direction, 90 deg is in the z direction
+P = 8 # [N] force applied at the end of the cantilever 
+P_Angle = 60   # [deg] angle of the force, 0 deg is in the y direction, 90 deg is in the z direction
 
 P_y = P*np.cos(np.deg2rad(P_Angle)) # [N] force in y direction
 P_z = P*np.sin(np.deg2rad(P_Angle)) # [N] force in z direction
@@ -34,7 +34,7 @@ P_z = P*np.sin(np.deg2rad(P_Angle)) # [N] force in z direction
 EI = 100 # [N*m^2] bending stiffness of the cantilever
 
 
-L = 6 # [m] length of the cantilever
+L = 4 # [m] length of the cantilever
 L_side = 1 # [m] length of the square side
 
 
@@ -54,7 +54,7 @@ params["L_0"] = params["L"] / (params["n_row"] - 1)  # [m] length of each segmen
 initial_conditions = []
 connections = []
 
-xyz_coordinates = np.empty((params["n"], 3))
+xyz_coordinates = np.zeros((params["n"], 3))
 
 for i in range(params["n"]):
     if i < params["n_row"]: 
@@ -104,7 +104,7 @@ fig = plt.figure()
 ax = fig.add_subplot(projection="3d")
 
 f_ext = 0
-f_ext = np.empty((params["n"], 3))
+f_ext = np.zeros((params["n"], 3))
 f_ext[params["n_row"]-1] = [0, -P_y/4, P_z/4]   # Apply a downward force on the last node
 f_ext[2*params["n_row"]-1] = [0, -P_y/4,P_z/4]  # Apply a downward force on the last node
 f_ext[3*params["n_row"]-1] = [0, -P_y/4, P_z/4]  # Apply a downward force on the last node

@@ -13,7 +13,6 @@ E = 1 # Pa
 rho = 1 # kg/m3
 
 x = np.linspace(0, L, n)
-print('x', x)
 y = np.zeros_like(x)
 b = 1 # m
 h = 1 # m
@@ -27,7 +26,6 @@ n1s = nids[0:-1]
 n2s = nids[1:]
 
 num_elements = len(n1s)
-print('num_elements', num_elements)
 
 p = TrussProbe()
 data = TrussData()
@@ -39,7 +37,6 @@ Mr = np.zeros(data.M_SPARSE_SIZE*num_elements, dtype=INT)
 Mc = np.zeros(data.M_SPARSE_SIZE*num_elements, dtype=INT)
 Mv = np.zeros(data.M_SPARSE_SIZE*num_elements, dtype=DOUBLE)
 N = DOF*n
-print('num_DOF', N)
 
 prop = BeamProp()
 prop.A = A
@@ -58,7 +55,6 @@ init_k_M = 0
 for n1, n2 in zip(n1s, n2s):
     pos1 = nid_pos[n1]
     pos2 = nid_pos[n2]
-    print('pos1', pos1, 'pos2', pos2)
     truss = Truss(p)
     truss.init_k_KC0 = init_k_KC0
     truss.init_k_M = init_k_M
@@ -74,12 +70,15 @@ for n1, n2 in zip(n1s, n2s):
     init_k_KC0 += data.KC0_SPARSE_SIZE
     init_k_M += data.M_SPARSE_SIZE
 
-print('elements created')
+for truss in trusses:
+
+    print(np.array(truss.probe.xe))
+# print('elements created')
 
 KC0 = coo_matrix((KC0v, (KC0r, KC0c)), shape=(N, N)).tocsc()
 M = coo_matrix((Mv, (Mr, Mc)), shape=(N, N)).tocsc()
 
-print('sparse KC0 and M created')
+# print('sparse KC0 and M created')
 # applying boundary conditions
 bk = np.zeros(N, dtype=bool)
 # Constraining 
@@ -94,7 +93,7 @@ fext = np.zeros(N)
 fext[DOF*num_elements] = 10  # force in x-direction at node 1
 
 Kuu = KC0[bu, :][:, bu]
-print('Kuu', Kuu)
+# print('Kuu', Kuu)
 u = np.zeros(N)
 print(fext[bu])
 
@@ -106,8 +105,8 @@ positions[0::DOF] = positions[1::DOF] = positions[2::DOF] = True
 for truss in trusses:
     truss.update_probe_ue(u)
     truss.update_probe_xe(ncoords_flatten+ u[positions])
-    print("ue",np.array(truss.probe.ue))
-    print("xe",np.array(np.round(truss.probe.xe,1)))
+    # print("ue",np.array(truss.probe.ue))
+    # print("xe",np.array(np.round(truss.probe.xe,1)))
 
 
 

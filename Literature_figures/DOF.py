@@ -11,7 +11,7 @@ plt.style.use('_mpl-gallery')
 np.random.seed(10)
 colors = ["b","orange","g","r","purple","brown","pink","gray"]
 
-names = ["Multi-Plate", "Particle Spring", "Multi-Body", "Finite Element"]
+names = ["Multi-Plate", "Particle System", "Multi-Body", "Finite Element"]
 data_mp = [6, 12, 18, 33]
 data_ps = [15, 15, 39, 111, 1122]
 data_mb = [400]
@@ -36,6 +36,7 @@ ax.grid(which='both')
 ax.set_xlabel("Degrees of Freedom")
 ax.set_ylim(0.5, len(names) + 0.5)
 ax.set_xscale('log')
+ax.set_xlim(1, 40000)
 ax.xaxis.set_major_formatter(ScalarFormatter())
 ax.ticklabel_format(style='plain', axis='x')
 
