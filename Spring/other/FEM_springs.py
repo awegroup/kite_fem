@@ -11,14 +11,14 @@ def smart_inverse(A, threshold=1e10):
     else:
         return np.linalg.pinv(A)
 
+
 # Define spring properties
 k = 1  # Stiffness of the first spring in N/m
 F = 10   # Force in N
-L = 1  # Length of each spring in m
-
+l0 = 1
 # Node coordinates
 ncoords = np.array([[0.0, 0.0, 0.0],  # Node at x = 0 m
-                    [1, .1, 0.0], # Node at x = 1 m
+                    [1, 2, 0.0], # Node at x = 1 m
                     [2, 0, 0.0]]) 
 
 nids = np.array([0, 1, 2])  # Node IDs
@@ -52,15 +52,14 @@ for n1, n2 in zip(n1s, n2s):
         spring.c1 = DOF * pos1
         spring.c2 = DOF * pos2
         spring.kxe =  k # Spring stiffness
-        xi = ncoords_init[n2*3] - ncoords_init[n1*3] 
-        xj = ncoords_init[n2*3+1] - ncoords_init[n1*3+1]
-        xk = ncoords_init[n2*3+2] - ncoords_init[n1*3+2]
-        tmp = (xi**2 + xj**2 + xk**2)**0.5
-        xi /= tmp
-        xj /= tmp
-        xk /= tmp
+        # xi = ncoords_init[n2*3] - ncoords_init[n1*3] 
+        # xj = ncoords_init[n2*3+1] - ncoords_init[n1*3+1]
+        # xk = ncoords_init[n2*3+2] - ncoords_init[n1*3+2]
+        # tmp = (xi**2 + xj**2 + xk**2)**0.5
+        # xi /= tmp
+        # xj /= tmp
+        # xk /= tmp
         spring.update_rotation_matrix(ncoords_init)
-        print("xi, xj, xk:", xi, xj, xk)
         spring.update_KC0(KC0r, KC0c, KC0v)
         springs.append(spring)
         init_k_KC0 += springdata.KC0_SPARSE_SIZE
@@ -68,7 +67,7 @@ for n1, n2 in zip(n1s, n2s):
 KC0 = coo_matrix((KC0v, (KC0r, KC0c)), shape=(N, N)).tocsc()
 
 bk = np.zeros(N, dtype=bool)
-bk[0:DOF] = True  # Fix the first node (x = 0 m)
+bk[0:DOF+1] = True  # Fix the first node (x = 0 m)
 bk[DOF+2:DOF*2] = True  # Fix the z and rotational DOF of the second node (x = 1 m)
 bk[DOF*2:DOF*3] = True  # Fix the third node (x = 2 m)
 bu = ~bk
@@ -93,7 +92,7 @@ u = np.zeros(N)
 u[bu] = uu  # Assign displacements to free DOFs
 
 # Define tolerance and maximum iterations
-tolerance = 1e-8
+tolerance = 1e-5
 max_iterations = 100
 
 # Initialize displacement vector
@@ -108,8 +107,28 @@ print("Initial Node Coordinates:", ncoords_init)
 
 # Iterative solver
 for iteration in range(max_iterations):
+    #compute internal forces
+    fi = np.zeros(N, dtype=DOUBLE)
+    for spring in springs:
+        c1 = spring.c1
+        c2 = spring.c2
+        n1 = spring.n1
+        n2 = spring.n2
+        xi = ncoords_current[n1*3] - ncoords_current[n1*3]
+        xj = ncoords_current[n2*3+1] - ncoords_current[n1*3+1]
+        xk = ncoords_current[n2*3+2] - ncoords_current[n1*3+2]
+        l = (xi**2 + xj**2 + xk**2)**(1/2)
+        fi_local = np.array([spring.kxe * (l - l0),0,0])  # Spring force
+        R = np.array([[spring.r11,spring.r12,spring.r13],[spring.r21,spring.r22,spring.r23],[spring.r31,spring.r32,spring.r33]])
+        fi_global = R @ fi_local  # Transform to global coordinates
+        fi_global = np.append(fi_global,[0,0,0])
+        bu1 = bu[spring.c1:spring.c1+DOF]
+        bu2 = bu[spring.c2:spring.c2+DOF]
+        fi[c1:c2] -= fi_global*bu1
+        fi[c2:c2+DOF] += fi_global*bu2
+        
     # Compute the residual
-    residual = fu - (KC0uu @ uu)
+    residual = fu - fi[bu]
 
     # Check if the residual is below the tolerance
     residual_norm = np.linalg.norm(residual)
@@ -118,23 +137,16 @@ for iteration in range(max_iterations):
         break
 
     # Update displacements 
-    uu += smart_inverse(KC0uu) @ residual 
+    uu += (smart_inverse(KC0uu) @ residual )
     
     u = np.zeros(N)
     u[bu] = uu  # Assign displacements to free DOFs
-    print("Current Node Coordinates:", ncoords_current)
 
     ncoords_current = ncoords_init + u[xyz]
-    
+    print("Current Node Coordinates:", ncoords_current)
+
     KC0v *= 0
     for spring in springs:
-        xi = ncoords_current[n2*3] - ncoords_current[n1*3] 
-        xj = ncoords_current[n2*3+1] - ncoords_current[n1*3+1]
-        xk = ncoords_current[n2*3+2] - ncoords_current[n1*3+2]
-        tmp = (xi**2 + xj**2 + xk**2)**0.5
-        xi /= tmp
-        xj /= tmp
-        xk /= tmp
         spring.update_rotation_matrix(ncoords_current)
         spring.update_KC0(KC0r, KC0c, KC0v)
         
@@ -150,3 +162,41 @@ print( "KC0uu @ uu",KC0uu @ uu)
 print("KC0uu:", KC0uu)
 # Assign displacements to the global displacement vector
 
+
+print(fi[bu])
+
+y = ncoords_current[4]
+x = 1
+hyp = (x**2 + y**2)**0.5
+F = k * (hyp - l0)  # Calculate the force in the spring
+print("Force in one spring:", F)
+Fy = F * (y / hyp)  # Vertical component of the force
+print("Vertical component of the force:", Fy)
+
+# fi = np.zeros(N, dtype=DOUBLE)
+# for spring in springs:
+#     print("spring:", spring)
+#     print("-------------------------------------------")
+#     c1 = spring.c1
+#     c2 = spring.c2
+#     n1 = spring.n1
+#     n2 = spring.n2
+#     xi = ncoords_current[n1*3] - ncoords_current[n1*3]
+#     xj = ncoords_current[n2*3+1] - ncoords_current[n1*3+1]
+#     xk = ncoords_current[n2*3+2] - ncoords_current[n1*3+2]
+#     l = (xi**2 + xj**2 + xk**2)**(1/2)
+#     fi_local = np.array([spring.kxe * (l - l0),0,0])  # Spring force
+#     R = np.array([[spring.r11,spring.r12,spring.r13],[spring.r21,spring.r22,spring.r23],[spring.r31,spring.r32,spring.r33]])
+#     fi_global = R @ fi_local  # Transform to global coordinates
+#     fi_global = np.append(fi_global,[0,0,0])
+    
+#     bu1 = bu[spring.c1:spring.c1+DOF]
+#     bu2 = bu[spring.c2:spring.c2+DOF]
+#     print("bu1:", bu1)
+#     print("bu2:", bu2)
+#     print("fi_global:", fi_global)
+#     print("c1:", c1, "c2:", c2)
+#     fi[c1:c2] -= fi_global*bu1
+#     fi[c2:c2+DOF] += fi_global*bu2
+#     print("fi:", fi)
+#     print("-------------------------------------------")
