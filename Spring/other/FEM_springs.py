@@ -114,7 +114,7 @@ for iteration in range(max_iterations):
         c2 = spring.c2
         n1 = spring.n1
         n2 = spring.n2
-        xi = ncoords_current[n1*3] - ncoords_current[n1*3]
+        xi = ncoords_current[n2*3] - ncoords_current[n1*3]
         xj = ncoords_current[n2*3+1] - ncoords_current[n1*3+1]
         xk = ncoords_current[n2*3+2] - ncoords_current[n1*3+2]
         l = (xi**2 + xj**2 + xk**2)**(1/2)
@@ -124,8 +124,8 @@ for iteration in range(max_iterations):
         fi_global = np.append(fi_global,[0,0,0])
         bu1 = bu[spring.c1:spring.c1+DOF]
         bu2 = bu[spring.c2:spring.c2+DOF]
-        fi[c1:c2] -= fi_global*bu1
-        fi[c2:c2+DOF] += fi_global*bu2
+        fi[n1*DOF:(n1+1)*DOF] -= fi_global*bu1
+        fi[n2*DOF:(n2+1)*DOF] += fi_global*bu2
         
     # Compute the residual
     residual = fu - fi[bu]
