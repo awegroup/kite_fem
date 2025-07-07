@@ -1,6 +1,7 @@
 import numpy as np
+import warnings
 from scipy.sparse import coo_matrix
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import spsolve,lsmr,MatrixRankWarning
 from pyfe3d import Spring, SpringData, SpringProbe, DOF, INT, DOUBLE
 import matplotlib.pyplot as plt
 
@@ -20,7 +21,11 @@ l0 = 0
 # convergence parameters, can be tuned for convergence
 limit = 1.0  # Maximum displacement limit in m
 relaxation = 1  # Initial under-relaxation factor for displacements
-offset = 0.01  # Introduce small offset in initial displacement of DOF's to avoid zero displacements
+offset = .0001 # Introduce small offset if a dof is 0, to prevent singularities. 
+
+# Define solver parameters
+tolerance = 1e-2
+max_iterations = 100
 
 # Node coordinates
 ncoords = np.array([[0.0, 0.0, 0.0],  # Node at x = 0 m
@@ -32,7 +37,7 @@ nid_pos = {nid: i for i, nid in enumerate(nids)}
 n1s = np.array([0, 1])
 n2s = np.array([1, 2])
 num_elements = len(nids)-1
-ncoords_init = ncoords.flatten()  # Flattened coordinates for probe updates
+ncoords_init = ncoords.flatten() 
 
 # Initialize spring data and probe
 springdata = SpringData()
@@ -66,39 +71,34 @@ for n1, n2 in zip(n1s, n2s):
 KC0 = coo_matrix((KC0v, (KC0r, KC0c)), shape=(N, N)).tocsc()
 
 bk = np.zeros(N, dtype=bool)
-bk[0:DOF+1] = True  # Fix the first node (x = 0 m)
+bk[0:DOF] = True  # Fix the first node (x = 0 m)
 bk[DOF+2:DOF*2] = True  # Fix the z and rotational DOF of the second node (x = 1 m)
 bk[DOF*2:DOF*3] = True  # Fix the third node (x = 2 m)
 bu = ~bk
 
-print("bu:", bu)
 f = np.zeros(N)
-
 f[DOF+1] = F    # Node 2, y
+f[DOF] = F*0.5    # Node 2, y
 
 KC0uu = KC0[bu, :][:, bu]
 fu = f[bu]
-KC0uu = KC0uu.toarray()
 
+try:
+    with warnings.catch_warnings():
+        warnings.filterwarnings("error", category=MatrixRankWarning)
+        uu = spsolve(KC0uu, fu)
+except MatrixRankWarning:
+    print("Matrix is singular, using LSMR solver instead.")
+    uu = lsmr(KC0uu, fu)[0]
 
-KC0uu_inv = smart_inverse(KC0uu)
-
-uu = KC0uu_inv @ fu  # Solve for displacements
-
-# limit the displacements to a maximum of 1.0
+# limit the displacements to a maximum of 1.0 and set a minimum displacement
 uu = np.clip(uu, -limit, limit)
-
-# implement small displacement to each dof if that dof is initially 0
-uu = np.where(uu == 0, offset, uu)
-
-
+uu = np.where(uu <= offset, offset, uu)
 
 u = np.zeros(N)
 u[bu] = uu  # Assign displacements to free DOFs
 
-# Define tolerance and maximum iterations
-tolerance = 1e-3
-max_iterations = 100
+
 
 
 xyz = np.zeros_like(u, dtype=bool)
@@ -111,14 +111,13 @@ print("Current Node Coordinates:", ncoords_current)
 residual_norm = 0
 # Iterative solver
 for iteration in range(max_iterations):
-    # Update reduced stiffness matrix
+    # Update stiffness matrix
     KC0v *= 0
     for spring in springs:
         spring.update_rotation_matrix(ncoords_current)
         spring.update_KC0(KC0r, KC0c, KC0v)
-        
     KC0 = coo_matrix((KC0v, (KC0r, KC0c)), shape=(N, N)).tocsc()
-    KC0uu = KC0[bu, :][:, bu].toarray() 
+    KC0uu = KC0[bu, :][:, bu]
     
     #compute internal forces
     fi = np.zeros(N, dtype=DOUBLE)
@@ -141,23 +140,34 @@ for iteration in range(max_iterations):
     # Compute the residual
     residual = fu - fi[bu]
 
-    # Check if the residual is below the tolerance
-    
+    #Assign previous residual norm
     residual_norm_prev = residual_norm
+    # Check if the residual is below the tolerance
     residual_norm = np.linalg.norm(residual)
     if residual_norm < tolerance:
         print("Converged in", iteration + 1, "iterations!")
         break
+    
+    # Check for divergence, relax solution if necessary
     if residual_norm_prev < residual_norm and iteration > 0:
         print("Diverging, relaxing solution.")
         relaxation *= 0.5
+    
+    # Update displacements. Attempting sparse solver first, and lsmr method if it fails
+    try:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("error", category=MatrixRankWarning)
+            duu = spsolve(KC0uu, residual)
+    except MatrixRankWarning:
+        print("Matrix is singular, using LSMR solver instead.")
+        duu = lsmr(KC0uu, residual)[0]
         
-
-    # Update displacements limit deltas of 1m
-    uu += np.clip((smart_inverse(KC0uu) @ residual)*relaxation,-limit,limit)
-    u = np.zeros(N)
+    uu += np.clip(duu*relaxation, -limit, limit)
+    uu = np.where(uu <= offset, offset, uu)
     u[bu] = uu  # Assign displacements to free DOFs
+    
 
+    
     ncoords_current = ncoords_init + u[xyz]
     print("Current Node Coordinates:", ncoords_current)
 
