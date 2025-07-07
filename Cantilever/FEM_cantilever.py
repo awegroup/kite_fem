@@ -7,9 +7,10 @@ from pyfe3d.beamprop import BeamProp
 from pyfe3d import BeamC, BeamCData, BeamCProbe, DOF, INT, DOUBLE
 from pyfe3d import BeamLR, BeamLRData, BeamLRProbe, DOF, INT, DOUBLE
 
-n = 15
-L = 10
+n = 10
+L = 100
 P = -50
+
 
 nu = 0.3
 rho = 7.83e3 # kg/m3
@@ -76,8 +77,9 @@ for n1, n2 in zip(n1s, n2s):
     beam.n2 = n2
     beam.c1 = DOF*pos1
     beam.c2 = DOF*pos2
-    beam.update_rotation_matrix(1,1,0,ncoords_flatten)
+    beam.update_rotation_matrix(ncoords_flatten)
     beam.update_probe_xe(ncoords_flatten)
+    # beam.length = L/(num_elements)
     beam.update_KC0(KC0r, KC0c, KC0v, prop)
     beam.update_KG(KC0r, KC0c, KC0v, prop)
     beams.append(beam)
@@ -147,16 +149,16 @@ for i in range(100):
     KC0v *= 0
     KGv *= 0
     for beam in beams:
-        beam.update_probe_ue(u)
-        beam.update_probe_xe(ncoords_current)   
-        beam.update_rotation_matrix(1,1,0,ncoords_current)
+        # beam.update_probe_ue(u)
+        # beam.update_probe_xe(ncoords_current)   
+        beam.update_rotation_matrix(ncoords_current)
         beam.update_KC0(KC0r, KC0c, KC0v, prop)
         beam.update_KG(KGr, KGc, KGv, prop)
 
        
-    beam.update_probe_ue(u)
-    beam.update_probe_xe(ncoords_current)   
-    beam.update_rotation_matrix(1,1,0,ncoords_current)
+    # beam.update_probe_ue(u)
+    # beam.update_probe_xe(ncoords_current)   
+    # beam.update_rotation_matrix(ncoords_current)
     KC0 = coo_matrix((KC0v, (KC0r, KC0c)), shape=(N, N)).tocsc()
     KG = coo_matrix((KGv, (KGr, KGc)), shape=(N, N)).tocsc()
 
@@ -170,18 +172,18 @@ for i in range(100):
     y = ncoords_current[1::3]
     z = ncoords_current[2::3]
     
-plt.plot(x, y, label="nonlinear beam deflection")
+    plt.plot(x, y, label="nonlinear beam deflection")
     
 
     
 # plt.plot(x, y, label="nonlinear beam deflection i="+str(i+1))
 
 
-# plt.plot(9.5,-3, 'ro', label="Target deflection")
+plt.plot(95,-30, 'ro', label="Target deflection")
 plt.xlabel('X-coordinate (m)')
 plt.ylabel('Y-coordinate (m)')
 plt.title("cantilever beam deflection under load")
-plt.legend()
+# plt.legend()
 plt.grid()
 plt.show()
 
