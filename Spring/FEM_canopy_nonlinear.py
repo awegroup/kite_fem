@@ -5,13 +5,28 @@ from scipy.sparse.linalg import spsolve,lsmr,MatrixRankWarning
 from pyfe3d import Spring, SpringData, SpringProbe, DOF, INT, DOUBLE
 import matplotlib.pyplot as plt
 
-def smart_inverse(A, threshold=1e10):
-    cond_number = np.linalg.cond(A)
-    if cond_number < threshold:
-        return np.linalg.inv(A)
-    else:
-        return np.linalg.pinv(A)
+def spring_internal_forces(spring, fi,  ncoords_current,l0):
+    """Calculate the internal forces in a spring based on current node coordinates."""
+    n1 = spring.n1
+    n2 = spring.n2
+    xi = ncoords_current[n2*3] - ncoords_current[n1*3]
+    xj = ncoords_current[n2*3+1] - ncoords_current[n1*3+1]
+    xk = ncoords_current[n2*3+2] - ncoords_current[n1*3+2]
+    l = (xi**2 + xj**2 + xk**2)**(1/2)
+    unit_vector = np.array([xi, xj, xk]) / l
+    f_s = spring.kxe * (l - l0)  # Spring force
+    fi_global = f_s * unit_vector  # Transform to global coordinates
+    fi_global = np.append(fi_global, [0, 0, 0]) #add rotational DOF's
+    bu1 = bu[spring.c1:spring.c1+DOF]
+    bu2 = bu[spring.c2:spring.c2+DOF]
+    fi[n1*DOF:(n1+1)*DOF] -= fi_global*bu1
+    fi[n2*DOF:(n2+1)*DOF] += fi_global*bu2
+    return fi
 
+
+""" TODO : Fix the offset issue
+    TODO: check convergence for all dofs
+""" 
 
 # Define spring properties
 k = 1  # Stiffness of the first spring in N/m
@@ -19,17 +34,18 @@ F = 1  # Force in N
 l0 = 0
 
 # convergence parameters, can be tuned for convergence
-limit = 1.0  # Maximum displacement limit in m
-relaxation = 1  # Initial under-relaxation factor for displacements
-offset = .0001 # Introduce small offset if a dof is 0, to prevent singularities. 
+limit = .1  # Maximum displacement limit in m per iteration  
+relaxation = 1  # Initial relaxation factor for displacements
+relaxtion_factor = 0.95  # Factor to reduce relaxation if divergence occurs
+offset = .01 # Introduce small offset if iteration is stuck due to numerical issues
 
 # Define solver parameters
-tolerance = 1e-2
-max_iterations = 100
+tolerance = 1e-1
+max_iterations = 1000
 
 # Node coordinates
 ncoords = np.array([[0.0, 0.0, 0.0],  # Node at x = 0 m
-                    [1, 0.0, 0.0], # Node at x = 1 m
+                    [1,0 , 0.0], # Node at x = 1 m
                     [2, 0, 0.0]]) 
 
 nids = np.array([0, 1, 2])  # Node IDs
@@ -38,6 +54,9 @@ n1s = np.array([0, 1])
 n2s = np.array([1, 2])
 num_elements = len(nids)-1
 ncoords_init = ncoords.flatten() 
+ncoords_current = ncoords_init.copy()
+
+print("Initial Node Coordinates:", ncoords_init)
 
 # Initialize spring data and probe
 springdata = SpringData()
@@ -70,47 +89,61 @@ for n1, n2 in zip(n1s, n2s):
 
 KC0 = coo_matrix((KC0v, (KC0r, KC0c)), shape=(N, N)).tocsc()
 
-bk = np.zeros(N, dtype=bool)
-bk[0:DOF] = True  # Fix the first node (x = 0 m)
-bk[DOF+2:DOF*2] = True  # Fix the z and rotational DOF of the second node (x = 1 m)
-bk[DOF*2:DOF*3] = True  # Fix the third node (x = 2 m)
+#Define DOF's / boundary conditions
+
+bk = np.ones(N, dtype=bool)
+bk[DOF] = False  # Free DOF at Node 1, x
+bk[DOF+1] = False  # Free DOF at Node 2, y
+bk[DOF+2] = False  # Free DOF at Node 2, z
 bu = ~bk
 
 f = np.zeros(N)
+f[DOF] = -.1*F    # Node 1, x
 f[DOF+1] = F    # Node 2, y
-f[DOF] = F*0.5    # Node 2, y
+f[DOF+2] = F    # Node 2, z
 
-KC0uu = KC0[bu, :][:, bu]
-fu = f[bu]
-
-try:
-    with warnings.catch_warnings():
-        warnings.filterwarnings("error", category=MatrixRankWarning)
-        uu = spsolve(KC0uu, fu)
-except MatrixRankWarning:
-    print("Matrix is singular, using LSMR solver instead.")
-    uu = lsmr(KC0uu, fu)[0]
-
-# limit the displacements to a maximum of 1.0 and set a minimum displacement
-uu = np.clip(uu, -limit, limit)
-uu = np.where(uu <= offset, offset, uu)
-
-u = np.zeros(N)
-u[bu] = uu  # Assign displacements to free DOFs
+fu = f[bu]  # Free DOFs force vector
 
 
-
-
-xyz = np.zeros_like(u, dtype=bool)
+xyz = np.zeros(N, dtype=bool)
 xyz[0::DOF] = xyz[1::DOF] = xyz[2::DOF] = True  
-ncoords_current = ncoords_init.copy()+u[xyz]  
 
-print("Initial Node Coordinates:", ncoords_init)
-print("Current Node Coordinates:", ncoords_current)
-
-residual_norm = 0
+residual_prev = 0
+residual = 0
+u = np.zeros(N, dtype=DOUBLE)  # Global displacement vector
+uu = u[bu]
+uu_prev = uu.copy()  # Previous displacements
 # Iterative solver
 for iteration in range(max_iterations):
+    #compute internal forces
+    fi = np.zeros(N, dtype=DOUBLE)
+    for spring in springs:
+        fi = spring_internal_forces(spring, fi, ncoords_current,l0)
+
+
+    # Compute the residual
+    residual_prev = residual
+    residual = fu - fi[bu]
+    # Assign previous residual norm
+    residual_norm_prev = np.linalg.norm(residual_prev)
+    # Check if the residual is below the tolerance
+    residual_norm = np.linalg.norm(residual)
+    
+    if residual_norm < tolerance:
+        print("Converged in", iteration + 1, "iterations!")
+        break
+    
+    # Check for divergence, relax solution if necessary
+    if residual_norm_prev < residual_norm and iteration > 0:
+        print("Diverging, relaxing solution, falling back on previous residual and deformation.")
+        residual = residual_prev
+        uu = uu_prev
+        relaxation *= relaxtion_factor
+        
+    elif residual_norm_prev == residual_norm and iteration > 0:
+        print("Solution stuck, adding offset.")
+        uu += offset
+        
     # Update stiffness matrix
     KC0v *= 0
     for spring in springs:
@@ -118,40 +151,6 @@ for iteration in range(max_iterations):
         spring.update_KC0(KC0r, KC0c, KC0v)
     KC0 = coo_matrix((KC0v, (KC0r, KC0c)), shape=(N, N)).tocsc()
     KC0uu = KC0[bu, :][:, bu]
-    
-    #compute internal forces
-    fi = np.zeros(N, dtype=DOUBLE)
-    for spring in springs:
-        n1 = spring.n1
-        n2 = spring.n2
-        xi = ncoords_current[n2*3] - ncoords_current[n1*3]
-        xj = ncoords_current[n2*3+1] - ncoords_current[n1*3+1]
-        xk = ncoords_current[n2*3+2] - ncoords_current[n1*3+2]
-        l = (xi**2 + xj**2 + xk**2)**(1/2)
-        fi_local = np.array([spring.kxe * (l - l0),0,0])  # Spring force
-        R = np.array([[spring.r11,spring.r12,spring.r13],[spring.r21,spring.r22,spring.r23],[spring.r31,spring.r32,spring.r33]])
-        fi_global = R @ fi_local  # Transform to global coordinates
-        fi_global = np.append(fi_global,[0,0,0])
-        bu1 = bu[spring.c1:spring.c1+DOF]
-        bu2 = bu[spring.c2:spring.c2+DOF]
-        fi[n1*DOF:(n1+1)*DOF] -= fi_global*bu1
-        fi[n2*DOF:(n2+1)*DOF] += fi_global*bu2
-        
-    # Compute the residual
-    residual = fu - fi[bu]
-
-    #Assign previous residual norm
-    residual_norm_prev = residual_norm
-    # Check if the residual is below the tolerance
-    residual_norm = np.linalg.norm(residual)
-    if residual_norm < tolerance:
-        print("Converged in", iteration + 1, "iterations!")
-        break
-    
-    # Check for divergence, relax solution if necessary
-    if residual_norm_prev < residual_norm and iteration > 0:
-        print("Diverging, relaxing solution.")
-        relaxation *= 0.5
     
     # Update displacements. Attempting sparse solver first, and lsmr method if it fails
     try:
@@ -162,25 +161,21 @@ for iteration in range(max_iterations):
         print("Matrix is singular, using LSMR solver instead.")
         duu = lsmr(KC0uu, residual)[0]
         
+    #Use convergence criteria to limit displacements
+    uu_prev = uu.copy()
     uu += np.clip(duu*relaxation, -limit, limit)
-    uu = np.where(uu <= offset, offset, uu)
-    u[bu] = uu  # Assign displacements to free DOFs
-    
 
-    
+    u[bu] = uu  
     ncoords_current = ncoords_init + u[xyz]
-    print("Current Node Coordinates:", ncoords_current)
-
+    
+    print("Current Node Coordinates:", ncoords_current)   
+    
+    
     
     
 
-    
 
-y = ncoords_current[4]
-x = 1
-hyp = (x**2 + y**2)**0.5
-F = k * (hyp - l0)  # Calculate the force in the spring
-print("Force in one spring:", F)
-Fy = F * (y / hyp)  # Vertical component of the force
-print("Vertical component of the force:", Fy)
+
+    
+    
 
