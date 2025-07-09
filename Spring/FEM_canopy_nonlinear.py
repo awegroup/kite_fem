@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 
 def spring_internal_forces(spring, fi,  ncoords_current,l0):
     """Calculate the internal forces in a spring based on current node coordinates."""
+    """ updates fi with the internal forces of the spring """
     n1 = spring.n1
     n2 = spring.n2
     xi = ncoords_current[n2*3] - ncoords_current[n1*3]
@@ -24,29 +25,29 @@ def spring_internal_forces(spring, fi,  ncoords_current,l0):
     return fi
 
 
-""" TODO : Fix the offset issue
-    TODO: check convergence for all dofs
+""" 
+    TODO: First solve for higher tolerance, then reset convergence parameters and solve again with lower tolerance.
 """ 
 
 # Define spring properties
 k = 1  # Stiffness of the first spring in N/m
-F = 1  # Force in N
-l0 = 0
+F = 10  # Force in N
+l0 = 1
 
 # convergence parameters, can be tuned for convergence
-limit = .1  # Maximum displacement limit in m per iteration  
+limit = .1 # Maximum displacement limit in m per iteration  
 relaxation = 1  # Initial relaxation factor for displacements
-relaxtion_factor = 0.95  # Factor to reduce relaxation if divergence occurs
-offset = .01 # Introduce small offset if iteration is stuck due to numerical issues
+relaxtion_factor = .95 # Factor to reduce relaxation if divergence occurs
+offset = .01 # Introduce offset if iteration is stuck due to numerical issues
 
 # Define solver parameters
-tolerance = 1e-1
-max_iterations = 1000
+tolerance = 1
+max_iterations = 100
 
 # Node coordinates
-ncoords = np.array([[0.0, 0.0, 0.0],  # Node at x = 0 m
-                    [1,0 , 0.0], # Node at x = 1 m
-                    [2, 0, 0.0]]) 
+ncoords = np.array([[0, 0, 0],  # Node at x = 0 m
+                    [1, 0, 0], # Node at x = 1 m
+                    [2, 0, 0]], dtype=DOUBLE) 
 
 nids = np.array([0, 1, 2])  # Node IDs
 nid_pos = {nid: i for i, nid in enumerate(nids)}
@@ -133,16 +134,22 @@ for iteration in range(max_iterations):
         print("Converged in", iteration + 1, "iterations!")
         break
     
+    if np.abs(residual_norm_prev - residual_norm) < 0.1 and iteration > 0:
+        print("Solution stuck, adding offset.")
+        uu += offset
+        uu_prev += offset
+        
     # Check for divergence, relax solution if necessary
     if residual_norm_prev < residual_norm and iteration > 0:
         print("Diverging, relaxing solution, falling back on previous residual and deformation.")
         residual = residual_prev
+        residual_norm = residual_norm_prev
         uu = uu_prev
         relaxation *= relaxtion_factor
         
-    elif residual_norm_prev == residual_norm and iteration > 0:
-        print("Solution stuck, adding offset.")
-        uu += offset
+    print("residual norm:", residual_norm, "residual_norm prev", residual_norm_prev)
+    
+
         
     # Update stiffness matrix
     KC0v *= 0
