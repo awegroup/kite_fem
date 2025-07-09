@@ -24,30 +24,42 @@ def spring_internal_forces(spring, fi,  ncoords_current,l0):
     fi[n2*DOF:(n2+1)*DOF] += fi_global*bu2
     return fi
 
+def solve_sparse_system(K, F):
+    """Solve the sparse system using spsolve or lsmr."""
+    try:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("error", category=MatrixRankWarning)
+            u = spsolve(K, F)
+    except MatrixRankWarning:
+        print("Matrix is singular, using LSMR solver instead.")
+        u = lsmr(K, F)[0]
+    return u
 
 """ 
-    TODO: First solve for higher tolerance, then reset convergence parameters and solve again with lower tolerance.
+    TODO: First solve for higher tolerance, then reset convergence parameters and solve again with lower tolerance., relate limit to tolerance 
 """ 
+
+
 
 # Define spring properties
 k = 1  # Stiffness of the first spring in N/m
 F = 10  # Force in N
-l0 = 1
+l0 = 0
 
 # convergence parameters, can be tuned for convergence
-limit = .1 # Maximum displacement limit in m per iteration  
+limit = .2 # Maximum displacement limit in m per iteration  
 relaxation = 1  # Initial relaxation factor for displacements
 relaxtion_factor = .95 # Factor to reduce relaxation if divergence occurs
-offset = .01 # Introduce offset if iteration is stuck due to numerical issues
+offset = .1 # Introduce offset if iteration is stuck due to numerical issues
 
 # Define solver parameters
-tolerance = 1
-max_iterations = 100
+tolerance = .1
+max_iterations = 50
 
 # Node coordinates
 ncoords = np.array([[0, 0, 0],  # Node at x = 0 m
                     [1, 0, 0], # Node at x = 1 m
-                    [2, 0, 0]], dtype=DOUBLE) 
+                    [2, 0, 0],], dtype=DOUBLE) 
 
 nids = np.array([0, 1, 2])  # Node IDs
 nid_pos = {nid: i for i, nid in enumerate(nids)}
@@ -93,27 +105,23 @@ KC0 = coo_matrix((KC0v, (KC0r, KC0c)), shape=(N, N)).tocsc()
 #Define DOF's / boundary conditions
 
 bk = np.ones(N, dtype=bool)
-bk[DOF] = False  # Free DOF at Node 1, x
-bk[DOF+1] = False  # Free DOF at Node 2, y
-bk[DOF+2] = False  # Free DOF at Node 2, z
+bk[DOF+1] = False  # Free DOF at Node 3, y
 bu = ~bk
 
 f = np.zeros(N)
-f[DOF] = -.1*F    # Node 1, x
-f[DOF+1] = F    # Node 2, y
-f[DOF+2] = F    # Node 2, z
-
+f[DOF+1] = F  # Node 3, y
 fu = f[bu]  # Free DOFs force vector
 
 
 xyz = np.zeros(N, dtype=bool)
 xyz[0::DOF] = xyz[1::DOF] = xyz[2::DOF] = True  
-
+templist = []  # List to store offsets for stuck iterations
 residual_prev = 0
 residual = 0
 u = np.zeros(N, dtype=DOUBLE)  # Global displacement vector
 uu = u[bu]
 uu_prev = uu.copy()  # Previous displacements
+rng = np.random.default_rng(seed=42)  # seed for reproducibility
 # Iterative solver
 for iteration in range(max_iterations):
     #compute internal forces
@@ -136,8 +144,10 @@ for iteration in range(max_iterations):
     
     if np.abs(residual_norm_prev - residual_norm) < 0.1 and iteration > 0:
         print("Solution stuck, adding offset.")
-        uu += offset
-        uu_prev += offset
+        temp = rng.uniform(low=-offset, high=offset, size=np.size(uu)) 
+        templist.append(temp)
+        uu += temp
+        uu_prev += temp
         
     # Check for divergence, relax solution if necessary
     if residual_norm_prev < residual_norm and iteration > 0:
@@ -146,11 +156,7 @@ for iteration in range(max_iterations):
         residual_norm = residual_norm_prev
         uu = uu_prev
         relaxation *= relaxtion_factor
-        
-    print("residual norm:", residual_norm, "residual_norm prev", residual_norm_prev)
-    
-
-        
+            
     # Update stiffness matrix
     KC0v *= 0
     for spring in springs:
@@ -160,13 +166,7 @@ for iteration in range(max_iterations):
     KC0uu = KC0[bu, :][:, bu]
     
     # Update displacements. Attempting sparse solver first, and lsmr method if it fails
-    try:
-        with warnings.catch_warnings():
-            warnings.filterwarnings("error", category=MatrixRankWarning)
-            duu = spsolve(KC0uu, residual)
-    except MatrixRankWarning:
-        print("Matrix is singular, using LSMR solver instead.")
-        duu = lsmr(KC0uu, residual)[0]
+    duu = solve_sparse_system(KC0uu, residual)
         
     #Use convergence criteria to limit displacements
     uu_prev = uu.copy()
@@ -183,6 +183,5 @@ for iteration in range(max_iterations):
 
 
 
-    
     
 
