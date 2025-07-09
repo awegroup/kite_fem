@@ -39,8 +39,6 @@ def solve_sparse_system(K, F):
     TODO: First solve for higher tolerance, then reset convergence parameters and solve again with lower tolerance., relate limit to tolerance 
 """ 
 
-
-
 # Define spring properties
 k = 1  # Stiffness of the first spring in N/m
 F = 10  # Force in N
@@ -58,13 +56,15 @@ max_iterations = 50
 
 # Node coordinates
 ncoords = np.array([[0, 0, 0],  # Node at x = 0 m
-                    [1, 0, 0], # Node at x = 1 m
-                    [2, 0, 0],], dtype=DOUBLE) 
+                    [.8, -.2, 0], # Node at x = 1 m
+                    [2, 0, 0],
+                    [0, 2, 0],
+                    [2, 2, 0]], dtype=DOUBLE) 
 
-nids = np.array([0, 1, 2])  # Node IDs
+nids = np.array([0, 1, 2, 3, 4])  # Node IDs
 nid_pos = {nid: i for i, nid in enumerate(nids)}
-n1s = np.array([0, 1])
-n2s = np.array([1, 2])
+n1s = np.array([0, 1, 1, 1])
+n2s = np.array([1, 2, 3 ,4])
 num_elements = len(nids)-1
 ncoords_init = ncoords.flatten() 
 ncoords_current = ncoords_init.copy()
@@ -84,6 +84,7 @@ N = DOF * len(nids)  # Total DOFs
 
 init_k_KC0 = 0
 springs = []
+springtypes = ["normal", "normal","non-compressive"]  
 for n1, n2 in zip(n1s, n2s):
         probe = SpringProbe()
         pos1 = nid_pos[n1]
@@ -105,11 +106,13 @@ KC0 = coo_matrix((KC0v, (KC0r, KC0c)), shape=(N, N)).tocsc()
 #Define DOF's / boundary conditions
 
 bk = np.ones(N, dtype=bool)
+bk[DOF] = False  # Free DOF at Node 3, xy
 bk[DOF+1] = False  # Free DOF at Node 3, y
+
 bu = ~bk
 
 f = np.zeros(N)
-f[DOF+1] = F  # Node 3, y
+# f[DOF+1] = F  # Node 3, y
 fu = f[bu]  # Free DOFs force vector
 
 
@@ -121,7 +124,8 @@ residual = 0
 u = np.zeros(N, dtype=DOUBLE)  # Global displacement vector
 uu = u[bu]
 uu_prev = uu.copy()  # Previous displacements
-rng = np.random.default_rng(seed=42)  # seed for reproducibility
+rng = np.random.default_rng(seed=1)  # seed for reproducibility
+
 # Iterative solver
 for iteration in range(max_iterations):
     #compute internal forces
@@ -142,7 +146,7 @@ for iteration in range(max_iterations):
         print("Converged in", iteration + 1, "iterations!")
         break
     
-    if np.abs(residual_norm_prev - residual_norm) < 0.1 and iteration > 0:
+    if np.abs(residual_norm_prev - residual_norm) < 0.1 and iteration > 0: # TODO change to any residual being stuck, instead of norm
         print("Solution stuck, adding offset.")
         temp = rng.uniform(low=-offset, high=offset, size=np.size(uu)) 
         templist.append(temp)
@@ -179,12 +183,16 @@ for iteration in range(max_iterations):
     
     
     
+for n in nids:
+    if n == 1:
+        plt.scatter(ncoords_init[n*3], ncoords_init[n*3+1], color='blue', label='Free Node', zorder=10)
+    else:
+        plt.scatter(ncoords_init[n*3], ncoords_init[n*3+1], color='red', label='Fixed Node' if n == 0 else "", zorder=10)
     
-
-
-
     
+plt.scatter(ncoords_current[3], ncoords_current[4], color='blue', zorder=10)
 
+ 
 for spring in springs:
     n1 = spring.n1
     n2 = spring.n2
@@ -194,14 +202,12 @@ for spring in springs:
     x_current = [ncoords_current[n1*3], ncoords_current[n2*3]]
     y_current = [ncoords_current[n1*3+1], ncoords_current[n2*3+1]]
     z_current = [ncoords_current[n1*3+2], ncoords_current[n2*3+2]]
-    plt.plot(x_init, y_init, 'ro-', label=f'Initial' if n1 == 0 else "")
-    plt.plot(x_current, y_current, 'bo-', label=f'Solution' if n1 == 0 else "")
+    plt.plot(x_init, y_init, 'r-', label=f'Initial' if n1 == 0 else "")
+    plt.plot(x_current, y_current, 'b-', label=f'Solution' if n1 == 0 else "")
 
 
-plt.arrow(1, 0, 0, F/5, color='green', width=0.01, head_width=0.1, head_length=.3 , length_includes_head=True, label= 'Force')
-plt.arrow(1, ncoords_current[4], 0, F/5, color='green', width=0.01, head_width=0.1, head_length=.3 , length_includes_head=True)
 
-plt.title("canopy deflection with springs. k = 1 N/m, F = 10 N, l0 = 0 m")
+plt.title("Relaxing Spring System, k = 1 N/m, F = 10 N, l0 = 0 m")
 plt.xlabel("x [m]")
 plt.ylabel("y [m]")
 
