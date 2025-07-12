@@ -61,6 +61,8 @@ class FEM_structure:
         if fe is None:
             fe = np.zeros(self.N, dtype=DOUBLE)
         self.fe = fe
+        
+        
         self.update_internal_forces()
         self.update_stiffness_matrix()
         residual = self.fe - self.fi
