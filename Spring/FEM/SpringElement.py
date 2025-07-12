@@ -81,7 +81,9 @@ if __name__ == "__main__":
     bu2 = bu[SpringElement1.spring.c2:SpringElement1.spring.c2+DOF]
     fi[SpringElement1.spring.n1*DOF:(SpringElement1.spring.n1+1)*DOF] -= fi_global*bu1
     fi[SpringElement1.spring.n2*DOF:(SpringElement1.spring.n2+1)*DOF] += fi_global*bu2
+    
     residual = fu - fi[bu]  # Calculate the residual
+    print("residual", residual)
     uu = spsolve(KC0uu, residual)  # Solve for displacements
     u = np.zeros(N)
     u[bu] = uu  # Fill in the displacements for free DOFs
