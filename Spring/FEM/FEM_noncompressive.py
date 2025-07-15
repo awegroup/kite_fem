@@ -29,6 +29,14 @@ def spring_internal_forces(spring, fi,  ncoords_current,l0,springtype):
     fi[n2*DOF:(n2+1)*DOF] += fi_global*bu2
     return fi
 
+def unit_vector(ncoords ,spring):
+        xi = ncoords[spring.c2//2 + 0] - ncoords[spring.c1//2 + 0]
+        xj = ncoords[spring.c2//2 + 1] - ncoords[spring.c1//2 + 1]
+        xk = ncoords[spring.c2//2 + 2] - ncoords[spring.c1//2 + 2]
+        l = (xi**2 + xj**2 + xk**2)**0.5
+        unit_vector = np.array([xi, xj, xk])/l
+        return unit_vector,l
+    
 def solve_sparse_system(K, F):
     """Solve the sparse system using spsolve or lsmr."""
     try:
@@ -50,12 +58,12 @@ def solve_sparse_system(K, F):
 k = 1  # Stiffness of the first spring in N/m
 F = 10  # Force in N
 l0_springs = [0,0,10]
-springtypes = ["normal", "normal", "noncompressive"]  
+springtypes = ["normal", "normal", "noncompressive"]  # Types of springs
 
 # convergence parameters, can be tuned for convergence
 limit = .2 # Maximum displacement limit in m per iteration  
 relaxation = 1  # Initial relaxation factor for displacements
-relaxtion_factor = .95 # Factor to reduce relaxation if divergence occurs
+relaxtion_factor = 1 # Factor to reduce relaxation if divergence occurs
 offset = .1 # Introduce offset if iteration is stuck due to numerical issues
 
 # Define solver parameters
@@ -66,7 +74,7 @@ max_iterations = 50
 ncoords = np.array([[0, 0, 0],  # Node at x = 0 m
                     [1, 0, 0], # Node at x = 1 m
                     [2, 0, 0],
-                    [1, 10,0]], dtype=DOUBLE) 
+                    [1, 0,10]], dtype=DOUBLE) 
 
 nids = np.array([0, 1, 2, 3])  # Node IDs
 nid_pos = {nid: i for i, nid in enumerate(nids)}
@@ -102,7 +110,10 @@ for n1, n2 in zip(n1s, n2s):
         spring.c1 = DOF * pos1
         spring.c2 = DOF * pos2
         spring.kxe =  k # Spring stiffness
-        spring.update_rotation_matrix(ncoords_init)
+        unit_vectors, l = unit_vector(ncoords_current, spring)
+        xi, xj ,xk = unit_vectors[0], unit_vectors[1], unit_vectors[2]      
+        vxyi, vxyj, vxyk =  unit_vectors[1], unit_vectors[2], unit_vectors[0] 
+        spring.update_rotation_matrix(xi, xj, xk, vxyi, vxyj, vxyk)
         spring.update_KC0(KC0r, KC0c, KC0v)
         springs.append(spring)
         init_k_KC0 += springdata.KC0_SPARSE_SIZE
@@ -112,7 +123,9 @@ KC0 = coo_matrix((KC0v, (KC0r, KC0c)), shape=(N, N)).tocsc()
 #Define DOF's / boundary conditions
 
 bk = np.ones(N, dtype=bool)
-bk[DOF+1] = False  # Free DOF at Node 3, y
+bk[DOF+1] = False  # Free DOF at Node 2, y
+bk[DOF+2] = False  # Free DOF at Node 2, z
+bk[DOF] = False  # Free DOF at Node 2, x
 bu = ~bk
 
 f = np.zeros(N)
@@ -148,10 +161,10 @@ for iteration in range(max_iterations):
     residual_norm = np.linalg.norm(residual)
     
     if residual_norm < tolerance:
-        print("Converged in", iteration + 1, "iterations!")
+        print("Converged in", iteration, "iterations!")
         break
     
-    if np.abs(residual_norm_prev - residual_norm) < 0.1 and iteration > 0:
+    if np.abs(residual_norm_prev - residual_norm) < offset and iteration > 0:
         print("Solution stuck, adding offset.")
         temp = rng.uniform(low=-offset, high=offset, size=np.size(uu)) 
         templist.append(temp)
@@ -169,7 +182,10 @@ for iteration in range(max_iterations):
     # Update stiffness matrix
     KC0v *= 0
     for spring in springs:
-        spring.update_rotation_matrix(ncoords_current)
+        unit_vectors, l = unit_vector(ncoords_current, spring)
+        xi, xj ,xk = unit_vectors[0], unit_vectors[1], unit_vectors[2]      
+        vxyi, vxyj, vxyk =  unit_vectors[1], unit_vectors[2], unit_vectors[0] 
+        spring.update_rotation_matrix(xi, xj, xk, vxyi, vxyj, vxyk)
         spring.update_KC0(KC0r, KC0c, KC0v)
     KC0 = coo_matrix((KC0v, (KC0r, KC0c)), shape=(N, N)).tocsc()
     KC0uu = KC0[bu, :][:, bu]
