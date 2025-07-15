@@ -25,15 +25,18 @@ class SpringElement:
         xj = ncoords[self.spring.c2//2 + 1] - ncoords[self.spring.c1//2 + 1]
         xk = ncoords[self.spring.c2//2 + 2] - ncoords[self.spring.c1//2 + 2]
         l = (xi**2 + xj**2 + xk**2)**0.5
-        unit_vector = np.array([xi, xj, xk])/l
-        return unit_vector,l
+        unit_vect = np.array([xi, xj, xk])/l
+        return unit_vect,l
     
     def update_KC0(self, KC0r : np.ndarray, KC0c : np.ndarray, KC0v : np.ndarray, ncoords : np.ndarray):
-        unit_vector,l = self.unit_vector(ncoords)
-        xi, xj ,xk = unit_vector[0], unit_vector[1], unit_vector[2]      
-        vxyi, vxyj, vxyk =  unit_vector[1], unit_vector[2], unit_vector[0] 
+        unit_vect,l = self.unit_vector(ncoords)
+        xi, xj ,xk = unit_vect[0], unit_vect[1], unit_vect[2]      
+        vxyi, vxyj, vxyk =  unit_vect[1], unit_vect[2], unit_vect[0] 
+        if xi == xj  and xj == xk: # Edge case, if all are the same then KC0 returns NaN's
+            vxyi = - vxyi
         self.spring.update_rotation_matrix(xi, xj, xk, vxyi, vxyj, vxyk)
         self.spring.update_KC0(KC0r, KC0c, KC0v)
+        return KC0r, KC0c, KC0v
     
     def spring_internal_forces(self, ncoords: np.ndarray):
         unit_vector,l = self.unit_vector(ncoords)
