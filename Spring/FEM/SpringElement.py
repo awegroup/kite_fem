@@ -20,7 +20,7 @@ class SpringElement:
         if self.springtype not in ("noncompressive", "default", "pulley"):
             raise ValueError("Invalid spring type. Choose from 'noncompressive', 'default', or 'pulley'.")
         
-    def unit_vector(self, ncoords : np.ndarray):
+    def __unit_vector(self, ncoords : np.ndarray):
         xi = ncoords[self.spring.c2//2 + 0] - ncoords[self.spring.c1//2 + 0]
         xj = ncoords[self.spring.c2//2 + 1] - ncoords[self.spring.c1//2 + 1]
         xk = ncoords[self.spring.c2//2 + 2] - ncoords[self.spring.c1//2 + 2]
@@ -29,17 +29,17 @@ class SpringElement:
         return unit_vect,l
     
     def update_KC0(self, KC0r : np.ndarray, KC0c : np.ndarray, KC0v : np.ndarray, ncoords : np.ndarray):
-        unit_vect,l = self.unit_vector(ncoords)
+        unit_vect,l = self.__unit_vector(ncoords)
         xi, xj ,xk = unit_vect[0], unit_vect[1], unit_vect[2]      
         vxyi, vxyj, vxyk =  unit_vect[1], unit_vect[2], unit_vect[0] 
         if xi == xj  and xj == xk: # Edge case, if all are the same then KC0 returns NaN's
-            vxyi = - vxyi
+            vxyi *= -1
         self.spring.update_rotation_matrix(xi, xj, xk, vxyi, vxyj, vxyk)
         self.spring.update_KC0(KC0r, KC0c, KC0v)
         return KC0r, KC0c, KC0v
     
     def spring_internal_forces(self, ncoords: np.ndarray):
-        unit_vector,l = self.unit_vector(ncoords)
+        unit_vector,l = self.__unit_vector(ncoords)
         if self.springtype == "noncompressive":
             if l < self.l0:
                 self.spring.kxe = 0
