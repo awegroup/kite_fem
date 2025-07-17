@@ -11,7 +11,8 @@ class SpringElement:
         self.spring.n2 = n2
         self.spring.c1 = self.DOF * n1
         self.spring.c2 = self.DOF * n2
-         
+        self.update_KC0v_only = 0
+
     def set_spring_properties(self, l0 : float, k : float, springtype : str):
         self.l0 = l0 
         self.k = k
@@ -35,7 +36,8 @@ class SpringElement:
         if xi == xj  and xj == xk: # Edge case, if all are the same then KC0 returns NaN's
             vxyi *= -1
         self.spring.update_rotation_matrix(xi, xj, xk, vxyi, vxyj, vxyk)
-        self.spring.update_KC0(KC0r, KC0c, KC0v)
+        self.spring.update_KC0(KC0r, KC0c, KC0v, self.update_KC0v_only)
+        self.update_KC0v_only = 1
         return KC0r, KC0c, KC0v
     
     def spring_internal_forces(self, ncoords: np.ndarray):
