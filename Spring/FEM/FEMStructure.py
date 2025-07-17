@@ -61,8 +61,8 @@ class FEM_structure:
     def solve(self, fe=None, max_iterations=1000, tolerance=1e-2,limit_init=1e-5,relax_init=0.5,relax_update=0.95, k_update=1):
         if fe is not None:
             self.fe = fe
-        u = np.zeros(self.N, dtype=DOUBLE)
-        uu = u[self.__bu]
+        displacement = np.zeros(self.N, dtype=DOUBLE)
+        displacement_bu = displacement[self.__bu]
         self.iteration_history = []
         self.residual_norm_history = []
         start_time = time.time()
@@ -84,12 +84,12 @@ class FEM_structure:
                 self.__update_stiffness_matrix()
                 relax *= relax_update
                 
-            duu = lsqr(self.KC0, residual)[0]
-            uu += np.clip(duu[self.__bu]*relax,-limit,limit) 
-            u[self.__bu] = uu
-            self.ncoords_current = self.ncoords_init + u[self.__xyz]
+            displacement_delta = lsqr(self.KC0, residual)[0]
+            displacement_bu += np.clip(displacement_delta[self.__bu]*relax,-limit,limit) 
+            displacement[self.__bu] = displacement_bu
+            self.ncoords_current = self.ncoords_init + displacement[self.__xyz]
         end_time = time.time()
-        print(f"Execution time: {end_time - start_time} seconds")
+        print(f"Solver time: {end_time - start_time} seconds")
 
     def plot_3D(self, color, ax=None, fig=None, plot_forces_displacements=False):
         if fig is None:
