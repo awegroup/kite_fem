@@ -11,28 +11,28 @@ class FEM_structure:
         self.num_nodes = len(initial_conditions)
         self.num_elements = len(connectivity_matrix)
         self.N = DOF * self.num_nodes
-        self.xyz = np.zeros(self.N, dtype=bool) 
-        self.xyz[0::DOF] = self.xyz[1::DOF] = self.xyz[2::DOF] = True  
+        self.__xyz = np.zeros(self.N, dtype=bool) 
+        self.__xyz[0::DOF] = self.__xyz[1::DOF] = self.__xyz[2::DOF] = True  
         self.fe = np.zeros(self.N, dtype=DOUBLE)  
         self.fi = np.zeros(self.N, dtype=DOUBLE)  
         self.__setup_initial_conditions(initial_conditions)
         self.__setup_spring_elements(connectivity_matrix)
 
     def __setup_initial_conditions(self, initial_conditions):
-        self.bu = np.zeros(self.N, dtype=bool)
+        self.__bu = np.zeros(self.N, dtype=bool)
         self.ncoords_init = np.zeros((self.num_nodes, 3), dtype=float)
         for id, (pos,vel,mass,fixed) in enumerate(initial_conditions):
             self.ncoords_init[id] = pos
             if fixed == False:
-                self.bu[DOF*id:DOF*id+3] = True
+                self.__bu[DOF*id:DOF*id+3] = True
         self.ncoords_init = self.ncoords_init.flatten()
         self.ncoords_current = self.ncoords_init.flatten()
         
     def __setup_spring_elements(self, connectivity_matrix):
         springdata = SpringData()
-        self.KC0r = np.zeros(springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)  
-        self.KC0c = np.zeros(springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)
-        self.KC0v = np.zeros(springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=DOUBLE)
+        self.__KC0r = np.zeros(springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)  
+        self.__KC0c = np.zeros(springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)
+        self.__KC0v = np.zeros(springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=DOUBLE)
         init_KC0 = 0
         self.spring_elements = []
         for (n1,n2,k,c,l0, springtype) in connectivity_matrix:
@@ -41,20 +41,20 @@ class FEM_structure:
             self.spring_elements.append(spring_element)
             init_KC0 += springdata.KC0_SPARSE_SIZE
 
-    def update_stiffness_matrix(self):
-        self.KC0v *= 0  
+    def __update_stiffness_matrix(self):
+        self.__KC0v *= 0  
         for spring_element in self.spring_elements:
-            self.KC0r, self.KC0c, self.KC0v = spring_element.update_KC0(self.KC0r, self.KC0c, self.KC0v, self.ncoords_current)
-        if np.count_nonzero(np.isnan(self.KC0v)) > 0:
+            self.__KC0r, self.__KC0c, self.__KC0v = spring_element.update_KC0(self.__KC0r, self.__KC0c, self.__KC0v, self.ncoords_current)
+        if np.count_nonzero(np.isnan(self.__KC0v)) > 0:
             raise ValueError(f"NaN detected in stiffness matrix, element: {spring_element.spring.n1}-{spring_element.spring.n2}")
-        self.KC0 = coo_matrix((self.KC0v, (self.KC0r, self.KC0c)), shape=(self.N, self.N)).tocsc()
+        self.KC0 = coo_matrix((self.__KC0v, (self.__KC0r, self.__KC0c)), shape=(self.N, self.N)).tocsc()
 
-    def update_internal_forces(self):
+    def __update_internal_forces(self):
         self.fi = np.zeros(self.N, dtype=DOUBLE)
         for spring_element in self.spring_elements:
             fi_element = spring_element.spring_internal_forces(self.ncoords_current)
-            bu1 = self.bu[spring_element.spring.c1:spring_element.spring.c1+DOF]
-            bu2 = self.bu[spring_element.spring.c2:spring_element.spring.c2+DOF]
+            bu1 = self.__bu[spring_element.spring.c1:spring_element.spring.c1+DOF]
+            bu2 = self.__bu[spring_element.spring.c2:spring_element.spring.c2+DOF]
             self.fi[spring_element.spring.n1*DOF:(spring_element.spring.n1+1)*DOF] -= fi_element*bu1
             self.fi[spring_element.spring.n2*DOF:(spring_element.spring.n2+1)*DOF] += fi_element*bu2
             
@@ -62,16 +62,16 @@ class FEM_structure:
         if fe is not None:
             self.fe = fe
         u = np.zeros(self.N, dtype=DOUBLE)
-        uu = u[self.bu]
+        uu = u[self.__bu]
         self.iteration_history = []
         self.residual_norm_history = []
         start_time = time.time()
         relax = relax_init
         limit = limit_init
         for iteration in range(max_iterations):
-            self.update_internal_forces()
+            self.__update_internal_forces()
             if iteration % k_update == 0:
-                self.update_stiffness_matrix()
+                self.__update_stiffness_matrix()
             residual = self.fe - self.fi
             residual_norm = np.linalg.norm(residual)
             self.residual_norm_history.append(residual_norm)
@@ -81,13 +81,13 @@ class FEM_structure:
                 break
             
             if  iteration > 10 and self.residual_norm_history[-1] >= min(self.residual_norm_history[-10:-1]):
-                self.update_stiffness_matrix()
+                self.__update_stiffness_matrix()
                 relax *= relax_update
                 
             duu = lsqr(self.KC0, residual)[0]
-            uu += np.clip(duu[self.bu]*relax,-limit,limit) 
-            u[self.bu] = uu
-            self.ncoords_current = self.ncoords_init + u[self.xyz]
+            uu += np.clip(duu[self.__bu]*relax,-limit,limit) 
+            u[self.__bu] = uu
+            self.ncoords_current = self.ncoords_init + u[self.__xyz]
         end_time = time.time()
         print(f"Execution time: {end_time - start_time} seconds")
 
@@ -100,7 +100,7 @@ class FEM_structure:
         node_types = {True: ("Free Node", color), False: ("Fixed Node", "black")}
         label_set = {"Free Node": False, "Fixed Node": False} 
         for n in range(self.num_nodes):
-            label, c = node_types[self.bu[n * DOF]]
+            label, c = node_types[self.__bu[n * DOF]]
             ax.scatter(self.ncoords_current[n * DOF // 2],
                     self.ncoords_current[n * DOF // 2 + 1],
                     self.ncoords_current[n * DOF // 2 + 2],
@@ -110,14 +110,12 @@ class FEM_structure:
         for i, spring_element in enumerate(self.spring_elements):
             n1 = spring_element.spring.n1
             n2 = spring_element.spring.n2
-            ax.plot([self.ncoords_current[n1 * DOF // 2], self.ncoords_current[n2 * DOF // 2]],
-                    [self.ncoords_current[n1 * DOF // 2 + 1], self.ncoords_current[n2 * DOF // 2 + 1]],
-                    [self.ncoords_current[n1 * DOF // 2 + 2], self.ncoords_current[n2 * DOF // 2 + 2]],
-                    color=color, label="Spring Element" if i == 0 else None)
+            ax.plot([self.ncoords_current[n1 * DOF // 2], self.ncoords_current[n2 * DOF // 2]], [self.ncoords_current[n1 * DOF // 2 + 1], self.ncoords_current[n2 * DOF // 2 + 1]], [self.ncoords_current[n1 * DOF // 2 + 2], self.ncoords_current[n2 * DOF // 2 + 2]],
+            color=color, label="Spring Element" if i == 0 else None)
 
         if plot_forces_displacements:
-            self.update_internal_forces()
-            self.update_stiffness_matrix()
+            self.__update_internal_forces()
+            self.__update_stiffness_matrix()
             residual = self.fe - self.fi
             displacement = lsqr(self.KC0, residual)[0]
             scale = 10
@@ -125,12 +123,12 @@ class FEM_structure:
                     coords = self.ncoords_current[node * DOF // 2:node * DOF // 2 + 3]
                     residual_vector = residual[DOF * node:DOF * node + 3] / scale
                     displacement_vector = displacement[DOF * node:DOF * node + 3] / scale * 5
-                    bu = self.bu[DOF * node:DOF * node + 3]
-                    ax.plot([coords[0], coords[0] + residual_vector[0]], [coords[1], coords[1] + residual_vector[1]], [coords[2], coords[2] + residual_vector[2]], color='green', linewidth=2, label='Residual Force Vector' if node == 0 else None)
-                    ax.plot([coords[0], coords[0] + displacement_vector[0]*bu[0]], [coords[1], coords[1] + displacement_vector[1]*bu[1]], [coords[2], coords[2] + displacement_vector[2]*bu[2]], color='orange', linewidth=2, label='Displacement Response' if node == 0 else None)                    
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
+                    bu = self.__bu[DOF * node:DOF * node + 3]
+                    ax.plot([coords[0], coords[0] + residual_vector[0]], [coords[1], coords[1] + residual_vector[1]], [coords[2], coords[2] + residual_vector[2]], 
+                    color='green', linewidth=2, label='Residual Force Vector' if node == 0 else None)
+                    ax.plot([coords[0], coords[0] + displacement_vector[0]*bu[0]], [coords[1], coords[1] + displacement_vector[1]*bu[1]], [coords[2], coords[2] + displacement_vector[2]*bu[2]], 
+                    color='orange', linewidth=2, label='Displacement Response' if node == 0 else None)                    
+        ax.set(xlabel='X', ylabel='Y', zlabel='Z')
         return ax, fig
     
     def plot_convergence(self, ax=None, fig=None):
@@ -139,8 +137,7 @@ class FEM_structure:
         if ax is None:
             ax = fig.add_subplot(111)
         ax.plot(self.iteration_history, self.residual_norm_history)
-        ax.set_xlabel('Iteration')
-        ax.set_ylabel('Residual Norm')
+        ax.set(xlabel='Iteration', ylabel='Residual')
         return ax, fig
     
 if __name__ == "__main__":
