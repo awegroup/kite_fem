@@ -68,7 +68,7 @@ class FEM_structure:
         start_time = time.time()
         relax = relax_init
         limit = limit_init
-        for iteration in range(max_iterations):
+        for iteration in range(max_iterations+1):
             self.__update_internal_forces()
             if iteration % k_update == 0:
                 self.__update_stiffness_matrix()
@@ -76,14 +76,19 @@ class FEM_structure:
             residual_norm = np.linalg.norm(residual)
             self.residual_norm_history.append(residual_norm)
             self.iteration_history.append(iteration)
+            
             if residual_norm < tolerance:
                 print(f"Converged after {iteration} iterations. Residual: {residual_norm}")
+                break
+                
+            if iteration == max_iterations:
+                print(f"Did not converge after {max_iterations} iterations. Residual: {residual_norm}")
                 break
             
             if  iteration > 10 and self.residual_norm_history[-1] >= min(self.residual_norm_history[-10:-1]):
                 self.__update_stiffness_matrix()
                 relax *= relax_update
-                
+            
             displacement_delta = lsqr(self.KC0, residual)[0]
             displacement_bu += np.clip(displacement_delta[self.__bu]*relax,-limit,limit) 
             displacement[self.__bu] = displacement_bu
