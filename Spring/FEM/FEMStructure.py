@@ -91,11 +91,13 @@ class FEM_structure:
         end_time = time.time()
         print(f"Solver time: {end_time - start_time} seconds")
 
-    def plot_3D(self, color, ax=None, fig=None, plot_forces_displacements=False):
+    def plot_3D(self, color, ax=None, fig=None, plot_forces_displacements=False, fe = None):
         if fig is None:
             fig = plt.figure()
         if ax is None:
             ax = fig.add_subplot(111, projection='3d')        
+        if fe is not None:
+            self.fe = fe
 
         node_types = {True: ("Free Node", color), False: ("Fixed Node", "black")}
         label_set = {"Free Node": False, "Fixed Node": False} 
