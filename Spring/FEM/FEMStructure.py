@@ -101,10 +101,7 @@ class FEM_structure:
         label_set = {"Free Node": False, "Fixed Node": False} 
         for n in range(self.num_nodes):
             label, c = node_types[self.__bu[n * DOF]]
-            ax.scatter(self.ncoords_current[n * DOF // 2],
-                    self.ncoords_current[n * DOF // 2 + 1],
-                    self.ncoords_current[n * DOF // 2 + 2],
-                    color=c, label=label if not label_set[label] else None)
+            ax.scatter(self.ncoords_current[n * DOF // 2], self.ncoords_current[n * DOF // 2 + 1], self.ncoords_current[n * DOF // 2 + 2], color=c, label=label if not label_set[label] else None)
             label_set[label] = True  
 
         for i, spring_element in enumerate(self.spring_elements):
@@ -118,16 +115,13 @@ class FEM_structure:
             self.__update_stiffness_matrix()
             residual = self.fe - self.fi
             displacement = lsqr(self.KC0, residual)[0]
-            scale = 10
+            scale = 5
             for node in range(self.num_nodes):
-                    coords = self.ncoords_current[node * DOF // 2:node * DOF // 2 + 3]
-                    residual_vector = residual[DOF * node:DOF * node + 3] / scale
-                    displacement_vector = displacement[DOF * node:DOF * node + 3] / scale * 5
-                    bu = self.__bu[DOF * node:DOF * node + 3]
-                    ax.plot([coords[0], coords[0] + residual_vector[0]], [coords[1], coords[1] + residual_vector[1]], [coords[2], coords[2] + residual_vector[2]], 
-                    color='green', linewidth=2, label='Residual Force Vector' if node == 0 else None)
-                    ax.plot([coords[0], coords[0] + displacement_vector[0]*bu[0]], [coords[1], coords[1] + displacement_vector[1]*bu[1]], [coords[2], coords[2] + displacement_vector[2]*bu[2]], 
-                    color='orange', linewidth=2, label='Displacement Response' if node == 0 else None)                    
+                coords = self.ncoords_current[node * DOF // 2:node * DOF // 2 + 3]
+                residual_vector = coords + residual[DOF * node:DOF * node + 3] / scale
+                displacement_vector = (coords + displacement[DOF * node:DOF * node + 3]*self.__bu[DOF * node:DOF * node + 3] / scale)
+                ax.plot([coords[0], residual_vector[0]], [coords[1], residual_vector[1]], [coords[2], residual_vector[2]], color='green', linewidth=2, label='Residual Force Vector' if node == 0 else None)
+                ax.plot([coords[0], displacement_vector[0]], [coords[1], displacement_vector[1]], [coords[2], displacement_vector[2]], color='orange', linewidth=2, label='Displacement Response' if node == 0 else None)                    
         ax.set(xlabel='X', ylabel='Y', zlabel='Z')
         return ax, fig
     
