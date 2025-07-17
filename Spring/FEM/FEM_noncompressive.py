@@ -17,6 +17,7 @@ noncompressive.solve(fe = fe, tolerance=1e-2, max_iterations=50, limit_init=0.2,
 ax3, fig3 = noncompressive.plot_3D(color='red')
 noncompressive.solve(fe = -fe, tolerance=1e-2, max_iterations=50, limit_init=0.2, relax_init=0.5,relax_update=0.95, k_update=1)
 ax4, fig4 = noncompressive.plot_3D(color='blue')
+
 # Plot the results
 ax1.legend()
 ax2.legend()
