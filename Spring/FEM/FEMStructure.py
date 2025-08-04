@@ -52,13 +52,20 @@ class FEM_structure:
     def __update_internal_forces(self):
         self.fi = np.zeros(self.N, dtype=DOUBLE)
         for spring_element in self.spring_elements:
-            fi_element = spring_element.spring_internal_forces(self.ncoords_current)
+            if spring_element.springtype == "pulley":
+                other_element = next((e for e in self.spring_elements if e.springtype == "pulley" and e.spring.n1 == spring_element.spring.n2 or e.spring.n2 == spring_element.spring.n1), None)
+                if not other_element:
+                    raise TypeError(f"No other pulley element found for pulley element n{spring_element.spring.n1}-n{spring_element.spring.n2}")
+                unit_vect, l_other_pulley = other_element.unit_vector(self.ncoords_current)
+                fi_element = spring_element.spring_internal_forces(self.ncoords_current, l_other_pulley)
+            else:
+                fi_element = spring_element.spring_internal_forces(self.ncoords_current)
             bu1 = self.__bu[spring_element.spring.c1:spring_element.spring.c1+DOF]
             bu2 = self.__bu[spring_element.spring.c2:spring_element.spring.c2+DOF]
             self.fi[spring_element.spring.n1*DOF:(spring_element.spring.n1+1)*DOF] -= fi_element*bu1
             self.fi[spring_element.spring.n2*DOF:(spring_element.spring.n2+1)*DOF] += fi_element*bu2
-            
-    def solve(self, fe=None, max_iterations=1000, tolerance=1e-2,limit_init=1e-5,relax_init=0.5,relax_update=0.95, k_update=1):
+        
+    def solve(self, fe=None, max_iterations=100, tolerance=1e-2,limit_init=0.2,relax_init=0.5,relax_update=0.95, k_update=1):
         if fe is not None:
             self.fe = fe
         displacement = np.zeros(self.N, dtype=DOUBLE)
@@ -73,7 +80,7 @@ class FEM_structure:
             if iteration % k_update == 0:
                 self.__update_stiffness_matrix()
             residual = self.fe - self.fi
-            residual_norm = np.linalg.norm(residual)
+            residual_norm = np.linalg.norm(residual[self.__bu])
             self.residual_norm_history.append(residual_norm)
             self.iteration_history.append(iteration)
             
@@ -149,15 +156,63 @@ if __name__ == "__main__":
     # Create FEM structure and solve
     SaddleForm = FEM_structure(initial_conditions, connectivity_matrix)
     ax1, fig1 = SaddleForm.plot_3D(color='red', plot_forces_displacements=True)
-    SaddleForm.solve(fe=None, max_iterations=300, tolerance=1, limit_init=0.25, relax_init=0.5, relax_update=0.75, k_update=25)
-    ax2, fig2 = SaddleForm.plot_3D(color='blue', plot_forces_displacements=False)
-    ax3, fig3 = SaddleForm.plot_convergence()
+    SaddleForm.solve(fe=None, max_iterations=1000, tolerance=.1, limit_init=0.25, relax_init=0.5, relax_update=0.75, k_update=25)
+    ax2, fig2 = SaddleForm.plot_3D(color='blue', plot_forces_displacements=True)
+    # ax3, fig3 = SaddleForm.plot_convergence()
 
+    elements = SaddleForm.spring_elements
+    ncoords = SaddleForm.ncoords_current
+    u = ncoords
+    for i in range(SaddleForm.num_nodes):
+        u = np.insert(u, (SaddleForm.num_nodes-i)*3, [0,0,0])
+        
+    # print(u)
+    # fint = np.zeros(SaddleForm.N)
+    # L = 50
+    # for element in elements:
+    #     fint = np.zeros(SaddleForm.N)
+    #     element.spring.update_probe_ue(u)
+    #     element.spring.update_fint(fint)
+    #     fint *= -1
+    #     n1 = element.spring.n1
+    #     n2 = element.spring.n2
+    #     n1x1, n1y1, n1z1 = ncoords[n1*3], ncoords[n1*3+1], ncoords[n1*3+2]
+    #     n1x2, n1y2, n1z2 = ncoords[n1*3] + fint[n1*6]/L, ncoords[n1*3+1] + fint[n1*6+1]/L, ncoords[n1*3+2] + fint[n1*6+2]/L
+    #     n2x1, n2y1, n2z1 = ncoords[n2*3], ncoords[n2*3+1], ncoords[n2*3+2]
+    #     n2x2, n2y2, n2z2 = ncoords[n2*3] + fint[n2*6]/L, ncoords[n2*3+1] + fint[n2*6+1]/L, ncoords[n2*3+2] + fint[n2*6+2]/L
+    #     ax2.plot([n1x1,n1x2],[n1y1,n1y2],[n1z1,n1z2], color='orange')
+    #     ax2.plot([n2x1,n2x2],[n2y1,n2y2],[n2z1,n2z2], color='orange')
+        # print(fint)
+
+    fint = np.zeros(SaddleForm.N)
+    for element in elements:
+        # element.spring.update_probe_ue(u)
+        element.spring.update_probe_ue(u)
+        element.spring.update_fint(fint)
+            
+    fint *= -1
+    L = 25
+    for node in range(len(initial_conditions)):
+        x = ncoords[node * 3]
+        x2 = x + fint[node * 6]/L
+        y = ncoords[node * 3 + 1]
+        y2 = y + fint[node * 6 + 1]/L
+        z = ncoords[node * 3 + 2]
+        z2 = z + fint[node * 6 + 2]/L
+        if initial_conditions[node][3] == False:
+            ax1.plot([x,x2], [y,y2], [z,z2], color='purple')
+        # ax1.plot([x,x2], [y,y2], [z,z2], color='purple')
+    
+    
     # Add legends and show plots
     ax1.legend()
-    ax2.legend()
-    ax3.grid()
+    ax1.set_xlim([-1,11])
+    ax1.set_ylim([-1,11])
+    ax1.set_zlim([-1,6])
+    # ax2.legend()
+    # ax3.grid()
     plt.show()
+    
     
     
     
