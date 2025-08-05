@@ -190,7 +190,7 @@ KGuu = KG[bu, :][:, bu]
 KC0_suu = KC0_s[bu, :][:, bu]
 Ktuu = KC0uu
 residual = fext - fint
-max_iterations = 2000
+max_iterations = 10
 u = np.zeros(N)
 du = np.zeros(N)
 xyz = np.zeros(N, dtype=bool)
@@ -208,8 +208,8 @@ for iteration in range(max_iterations+1):
 
     fint_beam = np.zeros(N)
     fint_spring = np.zeros(N)
-    KC0v *= 0
-    KGv *= 0
+    # KC0v *= 0
+    # KGv *= 0
     for beam,spring in zip(beams, springs):
         unit_vect, l = unit_vector(beam, ncoords_current)
         xi, xj ,xk = unit_vect[0], unit_vect[1], unit_vect[2]      
@@ -219,8 +219,8 @@ for iteration in range(max_iterations+1):
         beam.update_rotation_matrix(vxyi, vxyj, vxyk, ncoords_current)
         beam.update_probe_ue(u)
         # beam.update_probe_xe(ncoords_current)
-        beam.update_KC0(KC0r, KC0c, KC0v, prop)
-        beam.update_KG(KGr, KGc, KGv, prop)
+        # beam.update_KC0(KC0r, KC0c, KC0v, prop)
+        # beam.update_KG(KGr, KGc, KGv, prop)
         beam.update_fint(fint_beam, prop)
         spring.update_rotation_matrix(xi, xj, xk, vxyi, vxyj, vxyk)
         spring.update_probe_ue(u)

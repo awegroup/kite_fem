@@ -37,6 +37,10 @@ class FEM_structure:
         self.spring_elements = []
         for (n1,n2,k,c,l0, springtype) in connectivity_matrix:
             spring_element = SpringElement(n1, n2, init_KC0)
+            # unit_vect,l = spring_element.unit_vector(self.ncoords_init)
+            # l = l0
+            if springtype == "pulley":
+                l0 = 5.200
             spring_element.set_spring_properties(l0, k, springtype) 
             self.spring_elements.append(spring_element)
             init_KC0 += springdata.KC0_SPARSE_SIZE
@@ -53,9 +57,18 @@ class FEM_structure:
         self.fi = np.zeros(self.N, dtype=DOUBLE)
         for spring_element in self.spring_elements:
             if spring_element.springtype == "pulley":
-                other_element = next((e for e in self.spring_elements if e.springtype == "pulley" and e.spring.n1 == spring_element.spring.n2 or e.spring.n2 == spring_element.spring.n1), None)
+                
+                # other_element = next((e for e in self.spring_elements if e.springtype == "pulley" and (e.spring.n1 == spring_element.spring.n2 or e.spring.n2 == spring_element.spring.n1)), None)
+                matches = [
+                    e for e in self.spring_elements
+                    if e.springtype == "pulley" and (e.spring.n1 == spring_element.spring.n2 or e.spring.n2 == spring_element.spring.n1 or e.spring.n1 == spring_element.spring.n1 or e.spring.n2 == spring_element.spring.n2) and not e == spring_element
+                ]
+                other_element = matches[-1] if matches else None
                 if not other_element:
+                    print(f"Warning: No other pulley element found for pulley element n{spring_element.spring.n1}-n{spring_element.spring.n2}")
+                
                     raise TypeError(f"No other pulley element found for pulley element n{spring_element.spring.n1}-n{spring_element.spring.n2}")
+                
                 unit_vect, l_other_pulley = other_element.unit_vector(self.ncoords_current)
                 fi_element = spring_element.spring_internal_forces(self.ncoords_current, l_other_pulley)
             else:
@@ -64,7 +77,7 @@ class FEM_structure:
             bu2 = self.__bu[spring_element.spring.c2:spring_element.spring.c2+DOF]
             self.fi[spring_element.spring.n1*DOF:(spring_element.spring.n1+1)*DOF] -= fi_element*bu1
             self.fi[spring_element.spring.n2*DOF:(spring_element.spring.n2+1)*DOF] += fi_element*bu2
-        
+
     def solve(self, fe=None, max_iterations=100, tolerance=1e-2,limit_init=0.2,relax_init=0.5,relax_update=0.95, k_update=1):
         if fe is not None:
             self.fe = fe
@@ -100,6 +113,7 @@ class FEM_structure:
             displacement_bu += np.clip(displacement_delta[self.__bu]*relax,-limit,limit) 
             displacement[self.__bu] = displacement_bu
             self.ncoords_current = self.ncoords_init + displacement[self.__xyz]
+            print(displacement)
         end_time = time.time()
         print(f"Solver time: {end_time - start_time} seconds")
 
@@ -119,23 +133,30 @@ class FEM_structure:
             label_set[label] = True  
 
         for i, spring_element in enumerate(self.spring_elements):
+            c = color
+            # if spring_element.springtype == "pulley":
+            #     c = 'orange'
+            # if spring_element.springtype == "noncompressive":
+            #     c = 'green'
             n1 = spring_element.spring.n1
             n2 = spring_element.spring.n2
             ax.plot([self.ncoords_current[n1 * DOF // 2], self.ncoords_current[n2 * DOF // 2]], [self.ncoords_current[n1 * DOF // 2 + 1], self.ncoords_current[n2 * DOF // 2 + 1]], [self.ncoords_current[n1 * DOF // 2 + 2], self.ncoords_current[n2 * DOF // 2 + 2]],
-            color=color, label="Spring Element" if i == 0 else None)
+            color=c, label="Spring Element" if i == 0 else None)
 
         if plot_forces_displacements:
             self.__update_internal_forces()
             self.__update_stiffness_matrix()
             residual = self.fe - self.fi
             displacement = lsqr(self.KC0, residual)[0]
-            scale = 5
+            scale = 150
             for node in range(self.num_nodes):
                 coords = self.ncoords_current[node * DOF // 2:node * DOF // 2 + 3]
                 residual_vector = coords + residual[DOF * node:DOF * node + 3] / scale
-                displacement_vector = (coords + displacement[DOF * node:DOF * node + 3]*self.__bu[DOF * node:DOF * node + 3] / scale)
+                external_force_vector = coords + self.fe[DOF * node:DOF * node + 3] / scale
+                displacement_vector = (coords + displacement[DOF * node:DOF * node + 3]*self.__bu[DOF * node:DOF * node + 3])
                 ax.plot([coords[0], residual_vector[0]], [coords[1], residual_vector[1]], [coords[2], residual_vector[2]], color='green', linewidth=2, label='Residual Force Vector' if node == 0 else None)
                 ax.plot([coords[0], displacement_vector[0]], [coords[1], displacement_vector[1]], [coords[2], displacement_vector[2]], color='orange', linewidth=2, label='Displacement Response' if node == 0 else None)                    
+                ax.plot([coords[0], external_force_vector[0]], [coords[1], external_force_vector[1]], [coords[2], external_force_vector[2]], color='red', linewidth=2, label='External Force Vector' if node == 0 else None)
         ax.set(xlabel='X', ylabel='Y', zlabel='Z')
         return ax, fig
     
@@ -158,7 +179,7 @@ if __name__ == "__main__":
     ax1, fig1 = SaddleForm.plot_3D(color='red', plot_forces_displacements=True)
     SaddleForm.solve(fe=None, max_iterations=1000, tolerance=.1, limit_init=0.25, relax_init=0.5, relax_update=0.75, k_update=25)
     ax2, fig2 = SaddleForm.plot_3D(color='blue', plot_forces_displacements=True)
-    # ax3, fig3 = SaddleForm.plot_convergence()
+    ax3, fig3 = SaddleForm.plot_convergence()
 
     elements = SaddleForm.spring_elements
     ncoords = SaddleForm.ncoords_current

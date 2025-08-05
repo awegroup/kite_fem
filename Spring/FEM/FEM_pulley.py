@@ -11,10 +11,10 @@ Pulley = FEM_structure(initial_conditions, connectivity_matrix)
 fext = np.zeros(Pulley.N)
 fext[6+1] = -1
 fext[6] = 1
-ax1,fig1 = Pulley.plot_3D(color='blue', plot_forces_displacements=True, fe = None)
+ax1,fig1 = Pulley.plot_3D(color='blue', plot_forces_displacements=True, fe = fext)
 
-Pulley.solve(fe = fext, tolerance=1e-2, max_iterations=50, limit_init=0.2, relax_init=0.8,relax_update=0.95, k_update=1)
-ax2,fig2 = Pulley.plot_3D(color='red')
+Pulley.solve(fe = fext, tolerance=1e-2, max_iterations=10000, limit_init=0.2, relax_init=0.8,relax_update=0.95, k_update=1)
+ax2,fig2 = Pulley.plot_3D(color='red', plot_forces_displacements=True)
 ax3,fig3 = Pulley.plot_convergence()
 
 
@@ -32,6 +32,13 @@ print(Pulley.fi)
 for i in range(3):
     print(x[i], y[i], z[i])
 
+x_lst = [x[1],x[1]-2]
+y_lst = [y[1],y[1]+2]
+z_lst = [z[1],z[1]]
+ax2.plot(x_lst, y_lst, z_lst, color='black', linestyle='--')
+
+
+
 # value = -1
 # for element in elements:
 #     fi = element.spring_internal_forces(ncoords)
@@ -48,26 +55,34 @@ for i in range(3):
 # # L=2
 
 
+print("fint", Pulley.fi[6:12])
 
+ncoords = Pulley.ncoords_current
+elements = Pulley.spring_elements
+
+element1 = elements[0]
+element2 = elements[1]
+
+def fint_pulley(ncoords, element1, element2):
+    unit_vect, l1 = element1.unit_vector(ncoords)
+    unit_vect2, l2 = element2.unit_vector(ncoords)
+    l0_pulley = element1.l0
+    element1.l0 = l1 / (l1 + l2) * l0_pulley
+    element2.l0 = l2 / (l1 + l2) * l0_pulley
+    F11 = (l1-element1.l0) * element1.k
+    F22 = (l2-element2.l0) * element2.k
+    F11 = F11 * -unit_vect
+    F22 = F22 * unit_vect2
+    F11 = np.append(F11, [0, 0, 0])  # Append zeros for the z-component
+    F22 = np.append(F22, [0, 0, 0])
+    
+    print(F11)
+    print(F22)
+    fint = F11 + F22
+    print(fint )
+fint_pulley(ncoords, element1, element2)
 plt.show()
 
-
-# element1 = elements[0]
-# element2 = elements[1]
-
-# def fint_pulley(ncoords, element1, element2):
-#     unit_vect, l1 = element1.unit_vector(ncoords)
-#     unit_vect2, l2 = element2.unit_vector(ncoords)
-#     l0_pulley = element1.l0 + element2.l0
-#     element1.l0 = l1 / (l1 + l2) * l0_pulley
-#     element2.l0 = l2 / (l1 + l2) * l0_pulley
-#     F11 = (l1-element1.l0) * element1.k
-#     F22 = (l2-element2.l0) * element2.k
-#     print(F1,F11)
-#     print(F2,F22)
-
-
-    
 #     # fi1 = F1 * unit_vect
 #     # fi2 = F2 * unit_vect2
 
