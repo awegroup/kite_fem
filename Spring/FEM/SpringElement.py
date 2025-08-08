@@ -40,18 +40,17 @@ class SpringElement:
         self.update_KC0v_only = 1
         return KC0r, KC0c, KC0v
 
-    def spring_internal_forces(self, ncoords: np.ndarray, l_other_pulley = 0.0):
+    def spring_internal_forces(self, ncoords: np.ndarray, l_other_pulley:float = 0.0, l0_other_pulley:float = 0.0):
         unit_vector,l = self.unit_vector(ncoords)
-        if self.springtype == "noncompressive":
-            if l < self.l0:
-                self.spring.kxe = 0.01*self.k
+        if self.springtype == "noncompressive" or self.springtype == "pulley":
+            if l+l_other_pulley < (self.l0 + l0_other_pulley):
+                self.spring.kxe = 0
             else:
                 self.spring.kxe = self.k
-        pulley_factor = l / (l + l_other_pulley)
-        f_s = self.spring.kxe * (l - pulley_factor * self.l0) # TODO
+        f_s = self.spring.kxe * (l + l_other_pulley - self.l0 - l0_other_pulley)
         fi = f_s * unit_vector
         fi = np.append(fi, [0, 0, 0])
-        # print(fi)
+
         return fi
     
 

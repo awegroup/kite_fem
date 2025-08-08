@@ -37,10 +37,6 @@ class FEM_structure:
         self.spring_elements = []
         for (n1,n2,k,c,l0, springtype) in connectivity_matrix:
             spring_element = SpringElement(n1, n2, init_KC0)
-            # unit_vect,l = spring_element.unit_vector(self.ncoords_init)
-            # l = l0
-            if springtype == "pulley":
-                l0 = 5.200
             spring_element.set_spring_properties(l0, k, springtype) 
             self.spring_elements.append(spring_element)
             init_KC0 += springdata.KC0_SPARSE_SIZE
@@ -57,20 +53,17 @@ class FEM_structure:
         self.fi = np.zeros(self.N, dtype=DOUBLE)
         for spring_element in self.spring_elements:
             if spring_element.springtype == "pulley":
-                
-                # other_element = next((e for e in self.spring_elements if e.springtype == "pulley" and (e.spring.n1 == spring_element.spring.n2 or e.spring.n2 == spring_element.spring.n1)), None)
                 matches = [
                     e for e in self.spring_elements
                     if e.springtype == "pulley" and (e.spring.n1 == spring_element.spring.n2 or e.spring.n2 == spring_element.spring.n1 or e.spring.n1 == spring_element.spring.n1 or e.spring.n2 == spring_element.spring.n2) and not e == spring_element
                 ]
                 other_element = matches[-1] if matches else None
                 if not other_element:
-                    print(f"Warning: No other pulley element found for pulley element n{spring_element.spring.n1}-n{spring_element.spring.n2}")
-                
                     raise TypeError(f"No other pulley element found for pulley element n{spring_element.spring.n1}-n{spring_element.spring.n2}")
                 
-                unit_vect, l_other_pulley = other_element.unit_vector(self.ncoords_current)
-                fi_element = spring_element.spring_internal_forces(self.ncoords_current, l_other_pulley)
+                l_other_pulley = other_element.unit_vector(self.ncoords_current)[1]
+                l0_other_pulley = other_element.l0
+                fi_element = spring_element.spring_internal_forces(self.ncoords_current, l_other_pulley,l0_other_pulley)
             else:
                 fi_element = spring_element.spring_internal_forces(self.ncoords_current)
             bu1 = self.__bu[spring_element.spring.c1:spring_element.spring.c1+DOF]
@@ -90,8 +83,12 @@ class FEM_structure:
         limit = limit_init
         for iteration in range(max_iterations+1):
             self.__update_internal_forces()
+
             if iteration % k_update == 0:
                 self.__update_stiffness_matrix()
+            if iteration == 0:
+                print(self.fe)
+                print(self.fi)
             residual = self.fe - self.fi
             residual_norm = np.linalg.norm(residual[self.__bu])
             self.residual_norm_history.append(residual_norm)
@@ -113,7 +110,6 @@ class FEM_structure:
             displacement_bu += np.clip(displacement_delta[self.__bu]*relax,-limit,limit) 
             displacement[self.__bu] = displacement_bu
             self.ncoords_current = self.ncoords_init + displacement[self.__xyz]
-            print(displacement)
         end_time = time.time()
         print(f"Solver time: {end_time - start_time} seconds")
 
@@ -134,8 +130,8 @@ class FEM_structure:
 
         for i, spring_element in enumerate(self.spring_elements):
             c = color
-            # if spring_element.springtype == "pulley":
-            #     c = 'orange'
+            if spring_element.springtype == "pulley":
+                c = 'orange'
             # if spring_element.springtype == "noncompressive":
             #     c = 'green'
             n1 = spring_element.spring.n1
