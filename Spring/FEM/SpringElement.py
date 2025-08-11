@@ -42,15 +42,17 @@ class SpringElement:
 
     def spring_internal_forces(self, ncoords: np.ndarray, l_other_pulley:float = 0.0, l0_other_pulley:float = 0.0):
         unit_vector,l = self.unit_vector(ncoords)
+        k_fi = self.k
         if self.springtype == "noncompressive" or self.springtype == "pulley":
             if l+l_other_pulley < (self.l0 + l0_other_pulley):
-                self.spring.kxe = 0
+                self.spring.kxe = 0.01*self.k
+                k_fi = 0
             else:
                 self.spring.kxe = self.k
-        f_s = self.spring.kxe * (l + l_other_pulley - self.l0 - l0_other_pulley)
+                k_fi = self.k
+        f_s = k_fi * (l + l_other_pulley - self.l0 - l0_other_pulley)
         fi = f_s * unit_vector
         fi = np.append(fi, [0, 0, 0])
-
         return fi
     
 
