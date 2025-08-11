@@ -7,16 +7,29 @@ import matplotlib.pyplot as plt
 import time
 
 class FEM_structure:
-    def __init__(self, initial_conditions, connectivity_matrix):
+    def __init__(self, initial_conditions, spring_matrix = None, pulley_matrix = None):
         self.num_nodes = len(initial_conditions)
-        self.num_elements = len(connectivity_matrix)
+        self.num_elements = 0
+        if spring_matrix is not None:
+            self.num_elements += len(spring_matrix)
+        if pulley_matrix is not None:
+            self.num_elements += len(pulley_matrix)*2
         self.N = DOF * self.num_nodes
         self.__xyz = np.zeros(self.N, dtype=bool) 
         self.__xyz[0::DOF] = self.__xyz[1::DOF] = self.__xyz[2::DOF] = True  
         self.fe = np.zeros(self.N, dtype=DOUBLE)  
         self.fi = np.zeros(self.N, dtype=DOUBLE)  
-        self.__setup_initial_conditions(initial_conditions)
-        self.__setup_spring_elements(connectivity_matrix)
+        self.__springdata = SpringData()
+        self.__KC0r = np.zeros(self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)  
+        self.__KC0c = np.zeros(self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)
+        self.__KC0v = np.zeros(self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=DOUBLE)
+        self.init_KC0 = 0
+        self.spring_elements = []
+        self.__setup_initial_conditions(initial_conditions) 
+        if spring_matrix is not None:       
+            self.__setup_spring_elements(spring_matrix)
+        if pulley_matrix is not None:
+            self.__setup_pulley_elements(pulley_matrix)
 
     def __setup_initial_conditions(self, initial_conditions):
         self.__bu = np.zeros(self.N, dtype=bool)
@@ -29,17 +42,29 @@ class FEM_structure:
         self.ncoords_current = self.ncoords_init.flatten()
         
     def __setup_spring_elements(self, connectivity_matrix):
-        springdata = SpringData()
-        self.__KC0r = np.zeros(springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)  
-        self.__KC0c = np.zeros(springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)
-        self.__KC0v = np.zeros(springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=DOUBLE)
-        init_KC0 = 0
-        self.spring_elements = []
         for (n1,n2,k,c,l0, springtype) in connectivity_matrix:
-            spring_element = SpringElement(n1, n2, init_KC0)
+            if springtype.lower() == "pulley":
+                raise ValueError("Use pulley matrix for pulley elements")
+            spring_element = SpringElement(n1, n2, self.init_KC0)
             spring_element.set_spring_properties(l0, k, springtype) 
             self.spring_elements.append(spring_element)
-            init_KC0 += springdata.KC0_SPARSE_SIZE
+            self.init_KC0 += self.__springdata.KC0_SPARSE_SIZE
+
+    def __setup_pulley_elements(self,connectivity_matrix):
+        print("Setting up pulley elements")
+        for (n1,n2,n3,k,c,l0) in connectivity_matrix:
+            i_other_pulley = len(self.spring_elements)+1
+            spring_element = SpringElement(n1, n2, self.init_KC0)
+            print(f"set up spring element{n1,n2}")
+            spring_element.set_spring_properties(l0, k, "pulley", i_other_pulley) 
+            self.spring_elements.append(spring_element)
+            i_other_pulley -= 1
+            self.init_KC0 += self.__springdata.KC0_SPARSE_SIZE
+            spring_element = SpringElement(n2, n3, self.init_KC0)
+            print(f"set up spring element{n2,n3}")
+            spring_element.set_spring_properties(l0, k, "pulley", i_other_pulley) 
+            self.spring_elements.append(spring_element)
+            self.init_KC0 += self.__springdata.KC0_SPARSE_SIZE
 
     def __update_stiffness_matrix(self):
         self.__KC0v *= 0  
@@ -53,17 +78,10 @@ class FEM_structure:
         self.fi = np.zeros(self.N, dtype=DOUBLE)
         for spring_element in self.spring_elements:
             if spring_element.springtype == "pulley":
-                matches = [
-                    e for e in self.spring_elements
-                    if e.springtype == "pulley" and (e.spring.n1 == spring_element.spring.n2 or e.spring.n2 == spring_element.spring.n1 or e.spring.n1 == spring_element.spring.n1 or e.spring.n2 == spring_element.spring.n2) and not e == spring_element
-                ]
-                other_element = matches[-1] if matches else None
-                if not other_element:
-                    raise TypeError(f"No other pulley element found for pulley element n{spring_element.spring.n1}-n{spring_element.spring.n2}")
-                
+                other_element = self.spring_elements[spring_element.i_other_pulley]
+                print(f"Found pulley element {spring_element.spring.n1}-{spring_element.spring.n2} with other pulley element {other_element.spring.n1}-{other_element.spring.n2}")
                 l_other_pulley = other_element.unit_vector(self.ncoords_current)[1]
-                l0_other_pulley = other_element.l0
-                fi_element = spring_element.spring_internal_forces(self.ncoords_current, l_other_pulley,l0_other_pulley)
+                fi_element = spring_element.spring_internal_forces(self.ncoords_current, l_other_pulley)
             else:
                 fi_element = spring_element.spring_internal_forces(self.ncoords_current)
             bu1 = self.__bu[spring_element.spring.c1:spring_element.spring.c1+DOF]
@@ -75,7 +93,6 @@ class FEM_structure:
         if fe is not None:
             self.fe = fe
         displacement = np.zeros(self.N, dtype=DOUBLE)
-        displacement_bu = np.zeros(self.N, dtype=DOUBLE)
         self.iteration_history = []
         self.residual_norm_history = []
         start_time = time.time()
@@ -104,10 +121,10 @@ class FEM_structure:
                 self.__update_stiffness_matrix()
                 relax *= relax_update
             
-            # displacement_delta = lsqr(self.KC0, residual)[0]
+
+            
             displacement_delta = lsqr(self.KC0[self.__bu, :][:, self.__bu], residual[self.__bu])[0]
             displacement[self.__bu] += np.clip(displacement_delta*relax,-limit,limit) 
-            # displacement[self.__bu] = displacement_bu[self.__bu]
             
             self.ncoords_current = self.ncoords_init + displacement[self.__xyz]
         end_time = time.time()
@@ -131,8 +148,8 @@ class FEM_structure:
 
         for i, spring_element in enumerate(self.spring_elements):
             c = color
-            if spring_element.springtype == "pulley":
-                c = 'orange'
+            # if spring_element.springtype == "pulley":
+            #     c = 'orange'
             # if spring_element.springtype == "noncompressive":
             #     c = 'green'
             n1 = spring_element.spring.n1

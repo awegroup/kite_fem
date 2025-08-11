@@ -13,11 +13,13 @@ class SpringElement:
         self.spring.c2 = self.DOF * n2
         self.update_KC0v_only = 0
         
-    def set_spring_properties(self, l0 : float, k : float, springtype : str):
+    def set_spring_properties(self, l0 : float, k : float, springtype : str, i_other_pulley: int = 0):
         self.l0 = l0 
         self.k = k
         self.spring.kxe = k  
         self.springtype = springtype.lower()
+        if self.springtype == "pulley":
+            self.i_other_pulley = i_other_pulley
         if self.springtype not in ("noncompressive", "default", "pulley"):
             raise ValueError("Invalid spring type. Choose from 'noncompressive', 'default', or 'pulley'.")
         
@@ -40,17 +42,17 @@ class SpringElement:
         self.update_KC0v_only = 1
         return KC0r, KC0c, KC0v
 
-    def spring_internal_forces(self, ncoords: np.ndarray, l_other_pulley:float = 0.0, l0_other_pulley:float = 0.0):
+    def spring_internal_forces(self, ncoords: np.ndarray, l_other_pulley:float = 0.0):
         unit_vector,l = self.unit_vector(ncoords)
         k_fi = self.k
         if self.springtype == "noncompressive" or self.springtype == "pulley":
-            if l+l_other_pulley < (self.l0 + l0_other_pulley):
+            if l+l_other_pulley < (self.l0):
                 self.spring.kxe = 0.01*self.k
                 k_fi = 0
             else:
                 self.spring.kxe = self.k
                 k_fi = self.k
-        f_s = k_fi * (l + l_other_pulley - self.l0 - l0_other_pulley)
+        f_s = k_fi * (l + l_other_pulley - self.l0)
         fi = f_s * unit_vector
         fi = np.append(fi, [0, 0, 0])
         return fi
