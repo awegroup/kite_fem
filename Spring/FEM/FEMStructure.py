@@ -1,6 +1,6 @@
 from SpringElement import SpringElement
 from pyfe3d import DOF, INT, DOUBLE, SpringData
-from scipy.sparse import coo_matrix
+from scipy.sparse import coo_matrix, identity
 from scipy.sparse.linalg import lsqr
 import numpy as np
 import matplotlib.pyplot as plt
@@ -20,6 +20,8 @@ class FEM_structure:
         self.fe = np.zeros(self.N, dtype=DOUBLE)  
         self.fi = np.zeros(self.N, dtype=DOUBLE)  
         self.__springdata = SpringData()
+        self.__identity_matrix = identity(self.N, format='csc')
+
         self.__KC0r = np.zeros(self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)  
         self.__KC0c = np.zeros(self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)
         self.__KC0v = np.zeros(self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=DOUBLE)
@@ -43,25 +45,21 @@ class FEM_structure:
         
     def __setup_spring_elements(self, connectivity_matrix):
         for (n1,n2,k,c,l0, springtype) in connectivity_matrix:
-            if springtype.lower() == "pulley":
-                raise ValueError("Use pulley matrix for pulley elements")
+
             spring_element = SpringElement(n1, n2, self.init_KC0)
             spring_element.set_spring_properties(l0, k, springtype) 
             self.spring_elements.append(spring_element)
             self.init_KC0 += self.__springdata.KC0_SPARSE_SIZE
 
     def __setup_pulley_elements(self,connectivity_matrix):
-        print("Setting up pulley elements")
         for (n1,n2,n3,k,c,l0) in connectivity_matrix:
             i_other_pulley = len(self.spring_elements)+1
             spring_element = SpringElement(n1, n2, self.init_KC0)
-            print(f"set up spring element{n1,n2}")
             spring_element.set_spring_properties(l0, k, "pulley", i_other_pulley) 
             self.spring_elements.append(spring_element)
             i_other_pulley -= 1
             self.init_KC0 += self.__springdata.KC0_SPARSE_SIZE
             spring_element = SpringElement(n2, n3, self.init_KC0)
-            print(f"set up spring element{n2,n3}")
             spring_element.set_spring_properties(l0, k, "pulley", i_other_pulley) 
             self.spring_elements.append(spring_element)
             self.init_KC0 += self.__springdata.KC0_SPARSE_SIZE
@@ -73,13 +71,12 @@ class FEM_structure:
         if np.count_nonzero(np.isnan(self.__KC0v)) > 0:
             raise ValueError(f"NaN detected in stiffness matrix, element: {spring_element.spring.n1}-{spring_element.spring.n2}")
         self.KC0 = coo_matrix((self.__KC0v, (self.__KC0r, self.__KC0c)), shape=(self.N, self.N)).tocsc()
-
+        
     def __update_internal_forces(self):
         self.fi = np.zeros(self.N, dtype=DOUBLE)
         for spring_element in self.spring_elements:
             if spring_element.springtype == "pulley":
                 other_element = self.spring_elements[spring_element.i_other_pulley]
-                print(f"Found pulley element {spring_element.spring.n1}-{spring_element.spring.n2} with other pulley element {other_element.spring.n1}-{other_element.spring.n2}")
                 l_other_pulley = other_element.unit_vector(self.ncoords_current)[1]
                 fi_element = spring_element.spring_internal_forces(self.ncoords_current, l_other_pulley)
             else:
@@ -98,6 +95,7 @@ class FEM_structure:
         start_time = time.time()
         relax = relax_init
         limit = limit_init
+        param = 1
         for iteration in range(max_iterations+1):
             self.__update_internal_forces()
 
@@ -121,12 +119,20 @@ class FEM_structure:
                 self.__update_stiffness_matrix()
                 relax *= relax_update
             
-
+            if iteration == 100:
+                param *= 10
             
+            if iteration == 150:
+                param *= 10
+            
+            self.KC0 += param * self.__identity_matrix 
+
             displacement_delta = lsqr(self.KC0[self.__bu, :][:, self.__bu], residual[self.__bu])[0]
+            
             displacement[self.__bu] += np.clip(displacement_delta*relax,-limit,limit) 
             
             self.ncoords_current = self.ncoords_init + displacement[self.__xyz]
+
         end_time = time.time()
         
         print(f"Solver time: {end_time - start_time} seconds")
@@ -191,7 +197,7 @@ if __name__ == "__main__":
     # Create FEM structure and solve
     SaddleForm = FEM_structure(initial_conditions, connectivity_matrix)
     ax1, fig1 = SaddleForm.plot_3D(color='red', plot_forces_displacements=True)
-    SaddleForm.solve(fe=None, max_iterations=1000, tolerance=.1, limit_init=0.25, relax_init=0.5, relax_update=0.75, k_update=25)
+    SaddleForm.solve(fe=None, max_iterations=1000, tolerance=.1, limit_init=0.25, relax_init=0.25, relax_update=0.95, k_update=30)
     ax2, fig2 = SaddleForm.plot_3D(color='blue', plot_forces_displacements=True)
     ax3, fig3 = SaddleForm.plot_convergence()
 

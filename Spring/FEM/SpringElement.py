@@ -32,13 +32,13 @@ class SpringElement:
         return unit_vect,l
     
     def update_KC0(self, KC0r : np.ndarray, KC0c : np.ndarray, KC0v : np.ndarray, ncoords : np.ndarray):
-        unit_vect,l = self.unit_vector(ncoords)
+        unit_vect = self.unit_vector(ncoords)[0]
         xi, xj ,xk = unit_vect[0], unit_vect[1], unit_vect[2]      
         vxyi, vxyj, vxyk =  unit_vect[1], unit_vect[2], unit_vect[0] 
         if xi == xj  and xj == xk: # Edge case, if all are the same then KC0 returns NaN's
             vxyi *= -1
         self.spring.update_rotation_matrix(xi, xj, xk, vxyi, vxyj, vxyk)
-        self.spring.update_KC0(KC0r, KC0c, KC0v, self.update_KC0v_only)
+        self.spring.update_KC0(KC0r, KC0c, KC0v)
         self.update_KC0v_only = 1
         return KC0r, KC0c, KC0v
 
@@ -48,7 +48,7 @@ class SpringElement:
         if self.springtype == "noncompressive" or self.springtype == "pulley":
             if l+l_other_pulley < (self.l0):
                 self.spring.kxe = 0.01*self.k
-                k_fi = 0
+                k_fi = 0.0
             else:
                 self.spring.kxe = self.k
                 k_fi = self.k
