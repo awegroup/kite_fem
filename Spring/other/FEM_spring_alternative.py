@@ -12,7 +12,7 @@ k_spring = E * A / L0 # Spring constant (N/m)
 # Node 1 is fixed at the origin
 p1_initial = np.array([0.0, 0.0, 0.0])
 # Node 2 initial position
-p2_initial = np.array([1, 0.1,0])
+p2_initial = np.array([2, .1,-.3])
 
 # Applied external force at Node 2
 F_ext_node2 = np.array([1.0, 1.0, 0.0]) # (Fx, Fy, Fz)
@@ -54,9 +54,9 @@ p1_current = np.copy(p1_initial)
 p2_current = np.copy(p2_initial) # Current position of Node 2, starts at initial
 
 # Solver parameters
-num_iterations = 5000
+num_iterations = 50
 tolerance = 1e-8
-under_relaxation =.1 # Can help with convergence for some problems
+under_relaxation =1 # Can help with convergence for some problems
 
 print("Starting Newton-Raphson iterations...")
 print("------------------------------------")
@@ -89,8 +89,8 @@ for i in range(num_iterations):
 
     # 6. Form tangent stiffness matrix for Node 2's DOFs
     Ke_22 = get_elastic_stiffness_Ke22(k_spring_iterate, cx, cy, cz)
-    Kg_22 = get_geometric_stiffness_Kg22(P_axial_force, Lc, cx, cy, cz)
-    KT_22 = Ke_22
+    Kg_22 = get_geometric_stiffness_Kg22(P_axial_force, Lc-L0, cx, cy, cz)
+    KT_22 = Ke_22 + Kg_22
 
     # 7. Solve for incremental displacement of Node 2
     # delta_u_node2 = np.linalg.solve(KT_22, Residual_node2) # Can be unstable if KT_22 is singular
