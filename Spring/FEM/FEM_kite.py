@@ -20,7 +20,7 @@ ax1,fig1 = kite.plot_3D(color='black', plot_forces_displacements=False)
 # ax1.set_xlim([-5, 5])
 # ax1.set_ylim([-5, 5])
 # ax1.set_zlim([0, 10])
-kite.solve(fe=fe, max_iterations=500, tolerance=1, limit_init=0.2, relax_init=.25, relax_update=0.95, k_update=1)
+kite.solve(fe=fe, max_iterations=1000, tolerance=1, limit_init=0.1, relax_init=.25, relax_update=0.95, k_update=1)
 ax2,fig2 = kite.plot_3D(color='red',plot_forces_displacements=False)
 
 

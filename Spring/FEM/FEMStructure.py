@@ -40,7 +40,7 @@ class FEM_structure:
             self.ncoords_init[id] = pos
             if fixed == False:
                 self.__bu[DOF*id:DOF*id+3] = True
-        
+        self.__free_idx = np.flatnonzero(self.__bu)
         self.ncoords_init = self.ncoords_init.flatten()
         self.ncoords_current = self.ncoords_init.flatten()
         
@@ -103,6 +103,7 @@ class FEM_structure:
         }
         relax = relax_init
         limit = limit_init
+        displacement_delta = None
         for iteration in range(max_iterations+1):
             t0 = time.perf_counter()
             self.__update_internal_forces()
@@ -132,10 +133,10 @@ class FEM_structure:
                     self.__update_stiffness_matrix()
                     timings["update_stiffness"] += time.perf_counter() - t0
                 relax *= relax_update
-
-            t0 = time.perf_counter()
             
-            displacement_delta = lsqr(self.Kuu, residual[self.__bu])[0]
+            t0 = time.perf_counter()
+
+            displacement_delta = lsqr(self.Kuu, residual[self.__bu],atol=1e-7, btol=1e-7)[0]
 
             timings["linear_solve"] += time.perf_counter() - t0
 
