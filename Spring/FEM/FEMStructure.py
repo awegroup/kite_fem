@@ -89,7 +89,7 @@ class FEM_structure:
             self.fi[spring_element.spring.n1*DOF:(spring_element.spring.n1+1)*DOF] -= fi_element*bu1
             self.fi[spring_element.spring.n2*DOF:(spring_element.spring.n2+1)*DOF] += fi_element*bu2
 
-    def solve(self, fe=None, max_iterations=100, tolerance=1e-2,limit_init=0.2,relax_init=0.5,relax_update=0.95, k_update=1):
+    def solve(self, fe=None, max_iterations=100, tolerance=1e-2,step_limit=0.2,relax_init=0.5,relax_update=0.95, k_update=1):
         if fe is not None:
             self.fe = fe
         displacement = np.zeros(self.N, dtype=DOUBLE)
@@ -102,8 +102,6 @@ class FEM_structure:
             "linear_solve": 0.0,
         }
         relax = relax_init
-        limit = limit_init
-        displacement_delta = None
         for iteration in range(max_iterations+1):
             t0 = time.perf_counter()
             self.__update_internal_forces()
@@ -140,7 +138,7 @@ class FEM_structure:
 
             timings["linear_solve"] += time.perf_counter() - t0
 
-            displacement[self.__bu] += np.clip(displacement_delta*relax, -limit, limit)
+            displacement[self.__bu] += np.clip(displacement_delta*relax, -step_limit, step_limit)
             
             self.ncoords_current = self.ncoords_init + displacement[self.__xyz]
 
@@ -217,61 +215,20 @@ if __name__ == "__main__":
     # Create FEM structure and solve
     SaddleForm = FEM_structure(initial_conditions, connectivity_matrix)
     ax1, fig1 = SaddleForm.plot_3D(color='red', plot_forces_displacements=True)
-    SaddleForm.solve(fe=None, max_iterations=1000, tolerance=.1, limit_init=0.25, relax_init=0.25, relax_update=0.95, k_update=30)
-    ax2, fig2 = SaddleForm.plot_3D(color='blue', plot_forces_displacements=True)
+    SaddleForm.solve(fe=None, max_iterations=1000, tolerance=.1, step_limit=0.25, relax_init=0.25, relax_update=0.95, k_update=30)
+    ax2, fig2 = SaddleForm.plot_3D(color='blue', plot_forces_displacements=False)
     ax3, fig3 = SaddleForm.plot_convergence()
-
-    elements = SaddleForm.spring_elements
-    ncoords = SaddleForm.ncoords_current
-    u = ncoords
-    for i in range(SaddleForm.num_nodes):
-        u = np.insert(u, (SaddleForm.num_nodes-i)*3, [0,0,0])
         
-    # print(u)
-    # fint = np.zeros(SaddleForm.N)
-    # L = 50
-    # for element in elements:
-    #     fint = np.zeros(SaddleForm.N)
-    #     element.spring.update_probe_ue(u)
-    #     element.spring.update_fint(fint)
-    #     fint *= -1
-    #     n1 = element.spring.n1
-    #     n2 = element.spring.n2
-    #     n1x1, n1y1, n1z1 = ncoords[n1*3], ncoords[n1*3+1], ncoords[n1*3+2]
-    #     n1x2, n1y2, n1z2 = ncoords[n1*3] + fint[n1*6]/L, ncoords[n1*3+1] + fint[n1*6+1]/L, ncoords[n1*3+2] + fint[n1*6+2]/L
-    #     n2x1, n2y1, n2z1 = ncoords[n2*3], ncoords[n2*3+1], ncoords[n2*3+2]
-    #     n2x2, n2y2, n2z2 = ncoords[n2*3] + fint[n2*6]/L, ncoords[n2*3+1] + fint[n2*6+1]/L, ncoords[n2*3+2] + fint[n2*6+2]/L
-    #     ax2.plot([n1x1,n1x2],[n1y1,n1y2],[n1z1,n1z2], color='orange')
-    #     ax2.plot([n2x1,n2x2],[n2y1,n2y2],[n2z1,n2z2], color='orange')
-        # print(fint)
-
-    fint = np.zeros(SaddleForm.N)
-    for element in elements:
-        # element.spring.update_probe_ue(u)
-        element.spring.update_probe_ue(u)
-        element.spring.update_fint(fint)
-            
-    fint *= -1
-    L = 25
-    for node in range(len(initial_conditions)):
-        x = ncoords[node * 3]
-        x2 = x + fint[node * 6]/L
-        y = ncoords[node * 3 + 1]
-        y2 = y + fint[node * 6 + 1]/L
-        z = ncoords[node * 3 + 2]
-        z2 = z + fint[node * 6 + 2]/L
-        if initial_conditions[node][3] == False:
-            ax1.plot([x,x2], [y,y2], [z,z2], color='purple')
-        # ax1.plot([x,x2], [y,y2], [z,z2], color='purple')
-    
-    
-    # Add legends and show plots
     ax1.legend()
     ax1.set_xlim([-1,11])
     ax1.set_ylim([-1,11])
     ax1.set_zlim([-1,6])
-    # ax2.legend()
-    # ax3.grid()
+    
+    ax2.legend()
+    ax2.set_xlim([-1,11])
+    ax2.set_ylim([-1,11])
+    ax2.set_zlim([-1,6])
+
     plt.show()
 
 

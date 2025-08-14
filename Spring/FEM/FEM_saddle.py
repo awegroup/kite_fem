@@ -1,0 +1,26 @@
+    
+import matplotlib.pyplot as plt
+from FEMStructure import FEM_structure
+
+# Define initial conditions and connectivity matrix
+initial_conditions = [[[0.0, 0, 0.0], [0, 0, 0], 1, True], [[2.5, 0, 1.25], [0, 0, 0], 1, True], [[5.0, 0, 2.5], [0, 0, 0], 1, True], [[7.5, 0, 3.75], [0, 0, 0], 1, True], [[10.0, 0, 5.0], [0, 0, 0], 1, True], [[1.25, 1.25, 2.5], [0, 0, 0], 1, False], [[3.75, 1.25, 2.5], [0, 0, 0], 1, False], [[6.25, 1.25, 2.5], [0, 0, 0], 1, False], [[8.75, 1.25, 2.5], [0, 0, 0], 1, False], [[0.0, 2.5, 1.25], [0, 0, 0], 1, True], [[2.5, 2.5, 2.5], [0, 0, 0], 1, False], [[5.0, 2.5, 2.5], [0, 0, 0], 1, False], [[7.5, 2.5, 2.5], [0, 0, 0], 1, False], [[10.0, 2.5, 3.75], [0, 0, 0], 1, True], [[1.25, 3.75, 2.5], [0, 0, 0], 1, False], [[3.75, 3.75, 2.5], [0, 0, 0], 1, False], [[6.25, 3.75, 2.5], [0, 0, 0], 1, False], [[8.75, 3.75, 2.5], [0, 0, 0], 1, False], [[0.0, 5.0, 2.5], [0, 0, 0], 1, True], [[2.5, 5.0, 2.5], [0, 0, 0], 1, False], [[5.0, 5.0, 2.5], [0, 0, 0], 1, False], [[7.5, 5.0, 2.5], [0, 0, 0], 1, False], [[10.0, 5.0, 2.5], [0, 0, 0], 1, True], [[1.25, 6.25, 2.5], [0, 0, 0], 1, False], [[3.75, 6.25, 2.5], [0, 0, 0], 1, False], [[6.25, 6.25, 2.5], [0, 0, 0], 1, False], [[8.75, 6.25, 2.5], [0, 0, 0], 1, False], [[0.0, 7.5, 3.75], [0, 0, 0], 1, True], [[2.5, 7.5, 2.5], [0, 0, 0], 1, False], [[5.0, 7.5, 2.5], [0, 0, 0], 1, False], [[7.5, 7.5, 2.5], [0, 0, 0], 1, False], [[10.0, 7.5, 1.25], [0, 0, 0], 1, True], [[1.25, 8.75, 2.5], [0, 0, 0], 1, False], [[3.75, 8.75, 2.5], [0, 0, 0], 1, False], [[6.25, 8.75, 2.5], [0, 0, 0], 1, False], [[8.75, 8.75, 2.5], [0, 0, 0], 1, False], [[0.0, 10.0, 5.0], [0, 0, 0], 1, True], [[2.5, 10.0, 3.75], [0, 0, 0], 1, True], [[5.0, 10.0, 2.5], [0, 0, 0], 1, True], [[7.5, 10.0, 1.25], [0, 0, 0], 1, True], [[10.0, 10.0, 0.0], [0, 0, 0], 1, True]]
+spring_matrix = [[0, 5, 9, 1, 0, 'default'], [5, 1, 9, 1, 0, 'default'], [5, 9, 9, 1, 0, 'default'], [5, 10, 9, 1, 0, 'default'], [6, 1, 9, 1, 0, 'default'], [6, 2, 9, 1, 0, 'default'], [6, 10, 9, 1, 0, 'default'], [6, 11, 9, 1, 0, 'default'], [7, 2, 9, 1, 0, 'default'], [7, 3, 9, 1, 0, 'default'], [7, 11, 9, 1, 0, 'default'], [7, 12, 9, 1, 0, 'default'], [8, 3, 9, 1, 0, 'default'], [8, 4, 9, 1, 0, 'default'], [8, 12, 9, 1, 0, 'default'], [8, 13, 9, 1, 0, 'default'], [10, 14, 9, 1, 0, 'default'], [10, 15, 9, 1, 0, 'default'], [11, 15, 9, 1, 0, 'default'], [11, 16, 9, 1, 0, 'default'], [12, 16, 9, 1, 0, 'default'], [12, 17, 9, 1, 0, 'default'], [14, 9, 9, 1, 0, 'default'], [14, 18, 9, 1, 0, 'default'], [14, 19, 9, 1, 0, 'default'], [15, 19, 9, 1, 0, 'default'], [15, 20, 9, 1, 0, 'default'], [16, 20, 9, 1, 0, 'default'], [16, 21, 9, 1, 0, 'default'], [17, 13, 9, 1, 0, 'default'], [17, 21, 9, 1, 0, 'default'], [17, 22, 9, 1, 0, 'default'], [19, 23, 9, 1, 0, 'default'], [19, 24, 9, 1, 0, 'default'], [20, 24, 9, 1, 0, 'default'], [20, 25, 9, 1, 0, 'default'], [21, 25, 9, 1, 0, 'default'], [21, 26, 9, 1, 0, 'default'], [23, 18, 9, 1, 0, 'default'], [23, 27, 9, 1, 0, 'default'], [23, 28, 9, 1, 0, 'default'], [24, 28, 9, 1, 0, 'default'], [24, 29, 9, 1, 0, 'default'], [25, 29, 9, 1, 0, 'default'], [25, 30, 9, 1, 0, 'default'], [26, 22, 9, 1, 0, 'default'], [26, 30, 9, 1, 0, 'default'], [26, 31, 9, 1, 0, 'default'], [28, 32, 9, 1, 0, 'default'], [28, 33, 9, 1, 0, 'default'], [29, 33, 9, 1, 0, 'default'], [29, 34, 9, 1, 0, 'default'], [30, 34, 9, 1, 0, 'default'], [30, 35, 9, 1, 0, 'default'], [32, 27, 9, 1, 0, 'default'], [32, 36, 9, 1, 0, 'default'], [32, 37, 9, 1, 0, 'default'], [33, 37, 9, 1, 0, 'default'], [33, 38, 9, 1, 0, 'default'], [34, 38, 9, 1, 0, 'default'], [34, 39, 9, 1, 0, 'default'], [35, 31, 9, 1, 0, 'default'], [35, 39, 9, 1, 0, 'default'], [35, 40, 9, 1, 0, 'default']] 
+
+# Create FEM structure and solve
+SaddleForm = FEM_structure(initial_conditions, spring_matrix)
+ax1, fig1 = SaddleForm.plot_3D(color='red', plot_forces_displacements=True)
+SaddleForm.solve(fe=None, max_iterations=1000, tolerance=.1, step_limit=0.25, relax_init=0.25, relax_update=0.95, k_update=30)
+ax2, fig2 = SaddleForm.plot_3D(color='blue', plot_forces_displacements=False)
+ax3, fig3 = SaddleForm.plot_convergence()
+    
+ax1.legend()
+ax1.set_xlim([-1,11])
+ax1.set_ylim([-1,11])
+ax1.set_zlim([-1,6])
+
+ax2.legend()
+ax2.set_xlim([-1,11])
+ax2.set_ylim([-1,11])
+ax2.set_zlim([-1,6])
+
+plt.show()

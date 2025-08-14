@@ -14,9 +14,9 @@ noncompressive = FEM_structure(initial_conditions, connectivity_matrix)
 ax1, fig1 = noncompressive.plot_3D(color='red', plot_forces_displacements=True, fe=fe)
 ax2, fig2 = noncompressive.plot_3D(color='blue', plot_forces_displacements=True, fe=-fe)
 
-noncompressive.solve(fe = fe, tolerance=1e-2, max_iterations=50, limit_init=0.2, relax_init=0.5,relax_update=0.95, k_update=1)
+noncompressive.solve(fe = fe, tolerance=1e-2, max_iterations=50, step_limit=0.2, relax_init=0.5,relax_update=0.95, k_update=1)
 ax3, fig3 = noncompressive.plot_3D(color='red')
-noncompressive.solve(fe = -fe, tolerance=1e-2, max_iterations=50, limit_init=0.2, relax_init=0.5,relax_update=0.95, k_update=1)
+noncompressive.solve(fe = -fe, tolerance=1e-2, max_iterations=50, step_limit=0.2, relax_init=0.5,relax_update=0.95, k_update=1)
 ax4, fig4 = noncompressive.plot_3D(color='blue')
 
 # Plot the results
