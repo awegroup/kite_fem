@@ -38,7 +38,7 @@ class SpringElement:
         if xi == xj  and xj == xk: # Edge case, if all are the same then KC0 returns NaN's
             vxyi *= -1
         self.spring.update_rotation_matrix(xi, xj, xk, vxyi, vxyj, vxyk)
-        self.spring.update_KC0(KC0r, KC0c, KC0v)
+        self.spring.update_KC0(KC0r, KC0c, KC0v,self.update_KC0v_only)
         self.update_KC0v_only = 1
         return KC0r, KC0c, KC0v
 

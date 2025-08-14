@@ -1,7 +1,7 @@
 from SpringElement import SpringElement
 from pyfe3d import DOF, INT, DOUBLE, SpringData
 from scipy.sparse import coo_matrix, identity
-from scipy.sparse.linalg import lsqr
+from scipy.sparse.linalg import lsqr,lsmr
 import numpy as np
 import matplotlib.pyplot as plt
 import time
@@ -20,7 +20,7 @@ class FEM_structure:
         self.fe = np.zeros(self.N, dtype=DOUBLE)  
         self.fi = np.zeros(self.N, dtype=DOUBLE)  
         self.__springdata = SpringData()
-        self.__identity_matrix = identity(self.N, format='csc')
+        self.__identity_matrix = identity(self.N, format='csc')*25
 
         self.__KC0r = np.zeros(self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)  
         self.__KC0c = np.zeros(self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)
@@ -40,6 +40,7 @@ class FEM_structure:
             self.ncoords_init[id] = pos
             if fixed == False:
                 self.__bu[DOF*id:DOF*id+3] = True
+        
         self.ncoords_init = self.ncoords_init.flatten()
         self.ncoords_current = self.ncoords_init.flatten()
         
@@ -71,7 +72,9 @@ class FEM_structure:
         if np.count_nonzero(np.isnan(self.__KC0v)) > 0:
             raise ValueError(f"NaN detected in stiffness matrix, element: {spring_element.spring.n1}-{spring_element.spring.n2}")
         self.KC0 = coo_matrix((self.__KC0v, (self.__KC0r, self.__KC0c)), shape=(self.N, self.N)).tocsc()
-        
+        self.KC0 += self.__identity_matrix
+        self.Kuu = self.KC0[self.__bu, :][:, self.__bu]
+
     def __update_internal_forces(self):
         self.fi = np.zeros(self.N, dtype=DOUBLE)
         for spring_element in self.spring_elements:
@@ -92,15 +95,23 @@ class FEM_structure:
         displacement = np.zeros(self.N, dtype=DOUBLE)
         self.iteration_history = []
         self.residual_norm_history = []
-        start_time = time.time()
+        start_time = time.perf_counter()
+        timings = {
+            "update_internal_forces": 0.0,
+            "update_stiffness": 0.0,
+            "linear_solve": 0.0,
+        }
         relax = relax_init
         limit = limit_init
-        param = 1
         for iteration in range(max_iterations+1):
+            t0 = time.perf_counter()
             self.__update_internal_forces()
+            timings["update_internal_forces"] += time.perf_counter() - t0
 
             if iteration % k_update == 0:
+                t0 = time.perf_counter()
                 self.__update_stiffness_matrix()
+                timings["update_stiffness"] += time.perf_counter() - t0
 
             residual = self.fe - self.fi
             residual_norm = np.linalg.norm(residual[self.__bu])
@@ -115,28 +126,36 @@ class FEM_structure:
                 print(f"Did not converge after {max_iterations} iterations. Residual: {residual_norm}")
                 break
             
-            if  iteration > 10 and self.residual_norm_history[-1] >= min(self.residual_norm_history[-10:-1]):
-                self.__update_stiffness_matrix()
+            if iteration > 10 and self.residual_norm_history[-1] >= min(self.residual_norm_history[-10:-1]):
+                if iteration % k_update != 0:
+                    t0 = time.perf_counter()
+                    self.__update_stiffness_matrix()
+                    timings["update_stiffness"] += time.perf_counter() - t0
                 relax *= relax_update
-            
-            if iteration == 100:
-                param *= 10
-            
-            if iteration == 150:
-                param *= 10
-            
-            self.KC0 += param * self.__identity_matrix 
 
-            displacement_delta = lsqr(self.KC0[self.__bu, :][:, self.__bu], residual[self.__bu])[0]
+            t0 = time.perf_counter()
             
-            displacement[self.__bu] += np.clip(displacement_delta*relax,-limit,limit) 
+            displacement_delta = lsqr(self.Kuu, residual[self.__bu])[0]
+
+            timings["linear_solve"] += time.perf_counter() - t0
+
+            displacement[self.__bu] += np.clip(displacement_delta*relax, -limit, limit)
             
             self.ncoords_current = self.ncoords_init + displacement[self.__xyz]
 
-        end_time = time.time()
-        
-        print(f"Solver time: {end_time - start_time} seconds")
-
+        end_time = time.perf_counter()
+        total = end_time - start_time
+        print(f"Solver time: {total:.4f} s")
+        iters = max(1, len(self.iteration_history))
+        print("Timing summary (total / per-iter) [s]:")
+        for k, v in timings.items():
+            print(f"  {k:22s}: {v:.4f} / {v/iters:.6f}")
+        return
+    
+    def reinitialise(self):
+        self.ncoords_init = self.ncoords_current
+        #add rotational DOF's for beam?
+    
     def plot_3D(self, color, ax=None, fig=None, plot_forces_displacements=False, fe = None):
         if fig is None:
             fig = plt.figure()
@@ -154,8 +173,8 @@ class FEM_structure:
 
         for i, spring_element in enumerate(self.spring_elements):
             c = color
-            # if spring_element.springtype == "pulley":
-            #     c = 'orange'
+            if spring_element.springtype == "pulley":
+                c = 'orange'
             # if spring_element.springtype == "noncompressive":
             #     c = 'green'
             n1 = spring_element.spring.n1
@@ -253,7 +272,6 @@ if __name__ == "__main__":
     # ax2.legend()
     # ax3.grid()
     plt.show()
-    
-    
-    
-    
+
+
+
