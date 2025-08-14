@@ -11,7 +11,7 @@ fe[7] = 10  # Force applied at node 2 in y-direction
 # Create FEM structure and solve
 noncompressive = FEM_structure(initial_conditions, connectivity_matrix)
 ax1, fig1 = noncompressive.plot_3D(color='red', plot_forces_displacements=True, fe=fe)
-noncompressive.solve(fe = fe, tolerance=1e-2, max_iterations=50, step_limit=0.2, relax_init=0.5,relax_update=0.95, k_update=1)
+noncompressive.solve(fe = fe, tolerance=1e-2, max_iterations=500, step_limit=0.2, relax_init=0.5,relax_update=0.95, k_update=1)
 ax2, fig2 = noncompressive.plot_3D(color='blue')
 
 # Plot the results

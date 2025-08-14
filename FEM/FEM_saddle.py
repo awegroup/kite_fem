@@ -9,7 +9,7 @@ spring_matrix = [[0, 5, 9, 1, 0, 'default'], [5, 1, 9, 1, 0, 'default'], [5, 9, 
 # Create FEM structure and solve
 SaddleForm = FEM_structure(initial_conditions, spring_matrix)
 ax1, fig1 = SaddleForm.plot_3D(color='red', plot_forces_displacements=True)
-SaddleForm.solve(fe=None, max_iterations=1000, tolerance=.1, step_limit=0.25, relax_init=0.25, relax_update=0.95, k_update=30)
+SaddleForm.solve(fe=None, max_iterations=1000, tolerance=.1, step_limit=0.25, relax_init=0.25, relax_update=0.95, k_update=10)
 ax2, fig2 = SaddleForm.plot_3D(color='blue', plot_forces_displacements=False)
 ax3, fig3 = SaddleForm.plot_convergence()
     
