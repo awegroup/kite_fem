@@ -1,0 +1,49 @@
+[build-system]
+requires = [
+  "setuptools>=61.0",
+  "wheel",
+  "cython",        # pyfe3d has .pyx/.pxd
+  "numpy>=1.20",   # needed at build time for headers
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kite_fem"
+version = "0.1.0"
+description = "A package for structural fem simulation"
+readme = "README.md"
+keywords = ["Airborne Wind Energy", "Kites", "Simulation", "Finite Element Method"]
+
+authors = [{ name = "Patrick Roeleveld" }]
+maintainers = [{ name = "Patrick Roeleveld" }]
+
+dependencies = [
+  "matplotlib",
+  "numpy",
+  "scipy",
+
+  # Pull pyfe3d directly from GitHub
+  # Adjust branch/tag/commit as needed:
+  #   @main            -> default branch named 'main'
+  #   @master          -> if the repo uses 'master'
+  #   @<tag-or-sha>    -> pin to a release tag or commit
+  "pyfe3d @ git+https://github.com/saullocastro/pyfe3d.git@main",
+]
+
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python",
+  "Intended Audience :: Science/Research",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "--cov=kite_fem"
+
+[project.optional-dependencies]
+dev = ["pytest", "black", "flake8", "pytest-cov"]
+
+[project.urls]
+Repository = "https://github.com/awegroup/kite_fem.git"
