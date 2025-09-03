@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from FEMStructure import FEM_structure
+from kite_fem.FEMStructure import FEM_structure
 
 # Define initial conditions and connectivity matrix
 initial_conditions = [[[0.0, 0.0, 0.0], [0, 0, 0], 1, True],[[1.0, 0.0, 0.0], [0, 0, 0], 1, False],[[2.0, 0.0, 0.0], [0, 0, 0], 1, True],[[1.0, 10, 0.0], [0, 0, 0], 1, True]] #[position, velocity (not used), mass (not used),fixed]
