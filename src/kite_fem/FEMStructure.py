@@ -1,5 +1,6 @@
 from kite_fem.SpringElement import SpringElement
-from pyfe3d import DOF, INT, DOUBLE, SpringData
+from kite_fem.BeamElement import BeamElement
+from pyfe3d import DOF, INT, DOUBLE, SpringData, BeamCData
 from scipy.sparse import coo_matrix, identity
 from scipy.sparse.linalg import lsqr, lsmr
 import numpy as np
@@ -8,13 +9,17 @@ import time
 
 
 class FEM_structure:
-    def __init__(self, initial_conditions, spring_matrix=None, pulley_matrix=None):
+    def __init__(self, initial_conditions, spring_matrix=None, pulley_matrix=None, beam_matrix=None):
         self.num_nodes = len(initial_conditions)
-        self.num_elements = 0
+        self.num_spring_elements = 0
+        self.num_beam_elements = 0
         if spring_matrix is not None:
-            self.num_elements += len(spring_matrix)
+            self.num_spring_elements += len(spring_matrix)
         if pulley_matrix is not None:
-            self.num_elements += len(pulley_matrix) * 2
+            self.num_spring_elements += 2*len(pulley_matrix)
+        if beam_matrix is not None:
+            self.num_beam_elements += len(beam_matrix)
+        self.num_elements = self.num_spring_elements + self.num_beam_elements
         self.N = DOF * self.num_nodes
         self.__xyz = np.zeros(self.N, dtype=bool)
         self.__xyz[0::DOF] = self.__xyz[1::DOF] = self.__xyz[2::DOF] = True
@@ -23,34 +28,37 @@ class FEM_structure:
         self.__springdata = SpringData()
         self.__identity_matrix = identity(self.N, format="csc") * 25
 
-        self.__KC0r = np.zeros(
-            self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT
-        )
-        self.__KC0c = np.zeros(
-            self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT
-        )
-        self.__KC0v = np.zeros(
-            self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=DOUBLE
-        )
+        self.__KC0r = np.zeros(self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)
+        self.__KC0c = np.zeros(self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)
+        self.__KC0v = np.zeros(self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=DOUBLE)
+        
+        
         self.init_KC0 = 0
         self.spring_elements = []
+        self.beam_elements = []
         self.__setup_initial_conditions(initial_conditions)
         if spring_matrix is not None:
             self.__setup_spring_elements(spring_matrix)
         if pulley_matrix is not None:
             self.__setup_pulley_elements(pulley_matrix)
+        if beam_matrix is not None:
+            self.__setup_beam_elements(beam_matrix)
 
     def __setup_initial_conditions(self, initial_conditions):
         self.__bu = np.zeros(self.N, dtype=bool)
-        self.ncoords_init = np.zeros((self.num_nodes, 3), dtype=float)
+        self.coords_init = np.zeros((self.num_nodes, 3), dtype=float)
+        self.coords_rotations_init = np.zeros((self.num_nodes, 6), dtype=float)
         for id, (pos, vel, mass, fixed) in enumerate(initial_conditions):
-            self.ncoords_init[id] = pos
+            self.coords_init[id] = pos
+            self.coords_rotations_init[id] = np.concatenate([pos, [0, 0, 0]])
             if fixed == False:
                 self.__bu[DOF * id : DOF * id + 3] = True
-        self.__free_idx = np.flatnonzero(self.__bu)
-        self.ncoords_init = self.ncoords_init.flatten()
-        self.ncoords_current = self.ncoords_init.flatten()
+        self.coords_init = self.coords_init.flatten()
+        self.coords_current = self.coords_init.flatten()
+        self.coords_rotations_init = self.coords_rotations_init.flatten()
+        self.coords_rotations_current = self.coords_rotations_init.flatten()
 
+        
     def __setup_spring_elements(self, connectivity_matrix):
         for n1, n2, k, c, l0, springtype in connectivity_matrix:
 
@@ -72,42 +80,53 @@ class FEM_structure:
             self.spring_elements.append(spring_element)
             self.init_KC0 += self.__springdata.KC0_SPARSE_SIZE
 
+    def __setup_beam_elements(self, connectivity_matrix):
+        for n1, n2, E, A, I in connectivity_matrix:
+            beam_element = BeamElement(n1, n2, self.init_KC0)
+            L = beam_element.unit_vector(self.coords_init)[1]
+            beam_element.set_beam_properties(E, A, I,L)
+            self.beam_elements.append(beam_element)
+            self.init_KC0 += BeamCData.KC0_SPARSE_SIZE
+            self.__bu[DOF * n1 : DOF * n1 + 6] = True 
+            self.__bu[DOF * n2 : DOF * n2 + 6] = True #TODO smarter assigning of BU 
+        
     def __update_stiffness_matrix(self):
         self.__KC0v *= 0
         for spring_element in self.spring_elements:
-            self.__KC0r, self.__KC0c, self.__KC0v = spring_element.update_KC0(
-                self.__KC0r, self.__KC0c, self.__KC0v, self.ncoords_current
-            )
+            self.__KC0r, self.__KC0c, self.__KC0v = spring_element.update_KC0(self.__KC0r, self.__KC0c, self.__KC0v, self.coords_current)
+
+        for beam_element in self.beam_elements:
+            self.__KC0r, self.__KC0c, self.__KC0v = beam_element.beam.update_KC0(self.__KC0r, self.__KC0c, self.__KC0v, self.coords_current)
+            
         if np.count_nonzero(np.isnan(self.__KC0v)) > 0:
-            raise ValueError(
-                f"NaN detected in stiffness matrix, element: {spring_element.spring.n1}-{spring_element.spring.n2}"
+            raise ValueError(     f"NaN detected in stiffness matrix"
             )
-        self.KC0 = coo_matrix(
-            (self.__KC0v, (self.__KC0r, self.__KC0c)), shape=(self.N, self.N)
-        ).tocsc()
+                
+        self.KC0 = coo_matrix((self.__KC0v, (self.__KC0r, self.__KC0c)), shape=(self.N, self.N)).tocsc()
         self.KC0 += self.__identity_matrix
         self.Kuu = self.KC0[self.__bu, :][:, self.__bu]
 
     def __update_internal_forces(self):
         self.fi = np.zeros(self.N, dtype=DOUBLE)
+        
         for spring_element in self.spring_elements:
             if spring_element.springtype == "pulley":
                 other_element = self.spring_elements[spring_element.i_other_pulley]
-                l_other_pulley = other_element.unit_vector(self.ncoords_current)[1]
-                fi_element = spring_element.spring_internal_forces(
-                    self.ncoords_current, l_other_pulley
-                )
+                l_other_pulley = other_element.unit_vector(self.coords_current)[1]
+                fi_element = spring_element.spring_internal_forces(self.coords_current, l_other_pulley)
             else:
-                fi_element = spring_element.spring_internal_forces(self.ncoords_current)
+                fi_element = spring_element.spring_internal_forces(self.coords_current)
             bu1 = self.__bu[spring_element.spring.c1 : spring_element.spring.c1 + DOF]
             bu2 = self.__bu[spring_element.spring.c2 : spring_element.spring.c2 + DOF]
-            self.fi[
-                spring_element.spring.n1 * DOF : (spring_element.spring.n1 + 1) * DOF
-            ] -= (fi_element * bu1)
-            self.fi[
-                spring_element.spring.n2 * DOF : (spring_element.spring.n2 + 1) * DOF
-            ] += (fi_element * bu2)
+            self.fi[spring_element.spring.n1 * DOF : (spring_element.spring.n1 + 1) * DOF] -= (fi_element * bu1)
+            self.fi[spring_element.spring.n2 * DOF : (spring_element.spring.n2 + 1) * DOF] += (fi_element * bu2)
+            
+        for beam_element in self.beam_elements:
+            self.fi = beam_element.beam_internal_forces(self.fi,self.coords_rotations_current)
 
+
+        
+        
     def solve(
         self,
         fe=None,
@@ -177,8 +196,8 @@ class FEM_structure:
             displacement[self.__bu] += np.clip(
                 displacement_delta * relax, -step_limit, step_limit
             )
-
-            self.ncoords_current = self.ncoords_init + displacement[self.__xyz]
+            self.coords_rotations_current = self.coords_rotations_init + displacement
+            self.coords_current = self.coords_rotations_current[self.__xyz]
 
         end_time = time.perf_counter()
         total = end_time - start_time
@@ -190,7 +209,7 @@ class FEM_structure:
         return
 
     def reinitialise(self):
-        self.ncoords_init = self.ncoords_current
+        self.coords_init = self.coords_current
         # add rotational DOF's for beam?
 
     def plot_3D(
@@ -208,9 +227,9 @@ class FEM_structure:
         for n in range(self.num_nodes):
             label, c = node_types[self.__bu[n * DOF]]
             ax.scatter(
-                self.ncoords_current[n * DOF // 2],
-                self.ncoords_current[n * DOF // 2 + 1],
-                self.ncoords_current[n * DOF // 2 + 2],
+                self.coords_current[n * DOF // 2],
+                self.coords_current[n * DOF // 2 + 1],
+                self.coords_current[n * DOF // 2 + 2],
                 color=c,
                 label=label if not label_set[label] else None,
             )
@@ -226,16 +245,16 @@ class FEM_structure:
             n2 = spring_element.spring.n2
             ax.plot(
                 [
-                    self.ncoords_current[n1 * DOF // 2],
-                    self.ncoords_current[n2 * DOF // 2],
+                    self.coords_current[n1 * DOF // 2],
+                    self.coords_current[n2 * DOF // 2],
                 ],
                 [
-                    self.ncoords_current[n1 * DOF // 2 + 1],
-                    self.ncoords_current[n2 * DOF // 2 + 1],
+                    self.coords_current[n1 * DOF // 2 + 1],
+                    self.coords_current[n2 * DOF // 2 + 1],
                 ],
                 [
-                    self.ncoords_current[n1 * DOF // 2 + 2],
-                    self.ncoords_current[n2 * DOF // 2 + 2],
+                    self.coords_current[n1 * DOF // 2 + 2],
+                    self.coords_current[n2 * DOF // 2 + 2],
                 ],
                 color=c,
                 label="Spring Element" if i == 0 else None,
@@ -248,7 +267,7 @@ class FEM_structure:
             displacement = lsqr(self.KC0, residual)[0]
             scale = 150
             for node in range(self.num_nodes):
-                coords = self.ncoords_current[node * DOF // 2 : node * DOF // 2 + 3]
+                coords = self.coords_current[node * DOF // 2 : node * DOF // 2 + 3]
                 residual_vector = coords + residual[DOF * node : DOF * node + 3] / scale
                 external_force_vector = (
                     coords + self.fe[DOF * node : DOF * node + 3] / scale

@@ -23,16 +23,16 @@ class SpringElement:
         if self.springtype not in ("noncompressive", "default", "pulley"):
             raise ValueError("Invalid spring type. Choose from 'noncompressive', 'default', or 'pulley'.")
         
-    def unit_vector(self, ncoords : np.ndarray):
-        xi = ncoords[self.spring.c2//2 + 0] - ncoords[self.spring.c1//2 + 0]
-        xj = ncoords[self.spring.c2//2 + 1] - ncoords[self.spring.c1//2 + 1]
-        xk = ncoords[self.spring.c2//2 + 2] - ncoords[self.spring.c1//2 + 2]
+    def unit_vector(self, coords : np.ndarray):
+        xi = coords[self.spring.c2//2 + 0] - coords[self.spring.c1//2 + 0]
+        xj = coords[self.spring.c2//2 + 1] - coords[self.spring.c1//2 + 1]
+        xk = coords[self.spring.c2//2 + 2] - coords[self.spring.c1//2 + 2]
         l = (xi**2 + xj**2 + xk**2)**0.5
         unit_vect = np.array([xi, xj, xk])/l
         return unit_vect,l
     
-    def update_KC0(self, KC0r : np.ndarray, KC0c : np.ndarray, KC0v : np.ndarray, ncoords : np.ndarray):
-        unit_vect = self.unit_vector(ncoords)[0]
+    def update_KC0(self, KC0r : np.ndarray, KC0c : np.ndarray, KC0v : np.ndarray, coords : np.ndarray):
+        unit_vect = self.unit_vector(coords)[0]
         xi, xj ,xk = unit_vect[0], unit_vect[1], unit_vect[2]      
         vxyi, vxyj, vxyk =  unit_vect[1], unit_vect[2], unit_vect[0] 
         if xi == xj  and xj == xk: # Edge case, if all are the same then KC0 returns NaN's
@@ -42,8 +42,8 @@ class SpringElement:
         self.update_KC0v_only = 1
         return KC0r, KC0c, KC0v
 
-    def spring_internal_forces(self, ncoords: np.ndarray, l_other_pulley:float = 0.0):
-        unit_vector,l = self.unit_vector(ncoords)
+    def spring_internal_forces(self, coords: np.ndarray, l_other_pulley:float = 0.0):
+        unit_vector,l = self.unit_vector(coords)
         k_fi = self.k
         if self.springtype == "noncompressive" or self.springtype == "pulley":
             if l+l_other_pulley < (self.l0):
