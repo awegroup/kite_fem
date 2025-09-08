@@ -1,5 +1,6 @@
 import numpy as np
-from pyfe3d import BeamC, BeamCProbe,beamprop
+from pyfe3d import BeamC, BeamCProbe
+from pyfe3d.beamprop import BeamProp
 
 class BeamElement:
     def __init__(self, n1 : int, n2 : int, init_k_KC0 : int):
