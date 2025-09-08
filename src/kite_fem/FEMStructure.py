@@ -26,13 +26,14 @@ class FEM_structure:
         self.fe = np.zeros(self.N, dtype=DOUBLE)
         self.fi = np.zeros(self.N, dtype=DOUBLE)
         self.__springdata = SpringData()
-        self.__identity_matrix = identity(self.N, format="csc") * 25
+        self.__beamdata = BeamCData()
+        self.__identity_matrix = identity(self.N, format="csc")
 
-        self.__KC0r = np.zeros(self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)
-        self.__KC0c = np.zeros(self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)
-        self.__KC0v = np.zeros(self.__springdata.KC0_SPARSE_SIZE * self.num_elements, dtype=DOUBLE)
+        self.__KC0r = np.zeros(self.__beamdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)
+        self.__KC0c = np.zeros(self.__beamdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)
+        self.__KC0v = np.zeros(self.__beamdata.KC0_SPARSE_SIZE * self.num_elements, dtype=DOUBLE)
         
-        
+        self.I_stiffness = 0
         self.init_KC0 = 0
         self.spring_elements = []
         self.beam_elements = []
@@ -52,7 +53,8 @@ class FEM_structure:
             self.coords_init[id] = pos
             self.coords_rotations_init[id] = np.concatenate([pos, [0, 0, 0]])
             if fixed == False:
-                self.__bu[DOF * id : DOF * id + 3] = True
+                self.__bu[DOF * id : DOF * id + 6] = True
+        self.bu = self.__bu
         self.coords_init = self.coords_init.flatten()
         self.coords_current = self.coords_init.flatten()
         self.coords_rotations_init = self.coords_rotations_init.flatten()
@@ -86,9 +88,9 @@ class FEM_structure:
             L = beam_element.unit_vector(self.coords_init)[1]
             beam_element.set_beam_properties(E, A, I,L)
             self.beam_elements.append(beam_element)
-            self.init_KC0 += BeamCData.KC0_SPARSE_SIZE
-            self.__bu[DOF * n1 : DOF * n1 + 6] = True 
-            self.__bu[DOF * n2 : DOF * n2 + 6] = True #TODO smarter assigning of BU 
+            self.init_KC0 += self.__beamdata.KC0_SPARSE_SIZE
+            # self.__bu[DOF * n1 : DOF * n1 + 6] = True 
+            # self.__bu[DOF * n2 : DOF * n2 + 6] = True #TODO smarter assigning of BU 
         
     def __update_stiffness_matrix(self):
         self.__KC0v *= 0
@@ -96,14 +98,14 @@ class FEM_structure:
             self.__KC0r, self.__KC0c, self.__KC0v = spring_element.update_KC0(self.__KC0r, self.__KC0c, self.__KC0v, self.coords_current)
 
         for beam_element in self.beam_elements:
-            self.__KC0r, self.__KC0c, self.__KC0v = beam_element.beam.update_KC0(self.__KC0r, self.__KC0c, self.__KC0v, self.coords_current)
+            self.__KC0r, self.__KC0c, self.__KC0v = beam_element.update_KC0(self.__KC0r, self.__KC0c, self.__KC0v, self.coords_current)
             
         if np.count_nonzero(np.isnan(self.__KC0v)) > 0:
             raise ValueError(     f"NaN detected in stiffness matrix"
             )
                 
         self.KC0 = coo_matrix((self.__KC0v, (self.__KC0r, self.__KC0c)), shape=(self.N, self.N)).tocsc()
-        self.KC0 += self.__identity_matrix
+        self.KC0 += self.__identity_matrix*self.I_stiffness
         self.Kuu = self.KC0[self.__bu, :][:, self.__bu]
 
     def __update_internal_forces(self):
@@ -122,7 +124,7 @@ class FEM_structure:
             self.fi[spring_element.spring.n2 * DOF : (spring_element.spring.n2 + 1) * DOF] += (fi_element * bu2)
             
         for beam_element in self.beam_elements:
-            self.fi = beam_element.beam_internal_forces(self.fi,self.coords_rotations_current)
+            self.fi = beam_element.beam_internal_forces(self.fi,self.coords_rotations_current,self.coords_current)
 
 
         
@@ -136,6 +138,7 @@ class FEM_structure:
         relax_init=0.5,
         relax_update=0.95,
         k_update=1,
+        I_stiffness=25
     ):
         if fe is not None:
             self.fe = fe
@@ -143,6 +146,7 @@ class FEM_structure:
         self.iteration_history = []
         self.residual_norm_history = []
         start_time = time.perf_counter()
+        self.I_stiffness = I_stiffness
         timings = {
             "update_internal_forces": 0.0,
             "update_stiffness": 0.0,
@@ -258,6 +262,27 @@ class FEM_structure:
                 ],
                 color=c,
                 label="Spring Element" if i == 0 else None,
+            )
+
+        for i, beam_element in enumerate(self.beam_elements):
+            c = color
+            n1 = beam_element.beam.n1
+            n2 = beam_element.beam.n2
+            ax.plot(
+                [
+                    self.coords_current[n1 * DOF // 2],
+                    self.coords_current[n2 * DOF // 2],
+                ],
+                [
+                    self.coords_current[n1 * DOF // 2 + 1],
+                    self.coords_current[n2 * DOF // 2 + 1],
+                ],
+                [
+                    self.coords_current[n1 * DOF // 2 + 2],
+                    self.coords_current[n2 * DOF // 2 + 2],
+                ],
+                color=c,
+                label="Beam Element" if i == 0 else None,
             )
 
         if plot_forces_displacements:

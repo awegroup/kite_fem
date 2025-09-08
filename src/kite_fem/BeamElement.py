@@ -1,6 +1,6 @@
 import numpy as np
-from pyfe3d import BeamC, BeamCProbe
 from pyfe3d.beamprop import BeamProp
+from pyfe3d import BeamC, BeamCProbe
 
 class BeamElement:
     def __init__(self, n1 : int, n2 : int, init_k_KC0 : int):
@@ -20,10 +20,17 @@ class BeamElement:
         G = E/(2*(1+0.3))
         self.prop.G = G
         self.prop.A = A
+        self.prop.Ay = A*0.886
+        self.prop.Az = A*0.886
         self.prop.Iyy = I
         self.prop.Izz = I
         self.prop.Iyz = 0.0
         self.prop.J = 2*I
+        # rho = 1
+        # self.prop.intrho = A*rho
+        # self.prop.intrhoy2 = I*rho
+        # self.prop.intrhoz2 = I*rho 
+        # self.prop.intrhoyz = 0
         self.beam.length = L
 
     def unit_vector(self, coords : np.ndarray):
@@ -48,7 +55,7 @@ class BeamElement:
         self.update_KC0v_only = 1
         return KC0r, KC0c, KC0v
 
-    def beam_internal_forces(self, fi, coords_rotations,coords: np.ndarray):
+    def beam_internal_forces(self, fi, coords_rotations, coords: np.ndarray):
         self.beam.update_probe_ue(coords_rotations)
         self.__update_rotation_matrix(coords)
         self.beam.update_fint(fi,self.prop)
