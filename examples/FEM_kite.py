@@ -29,6 +29,10 @@ ax2.set_xlim([-5, 5])
 ax2.set_ylim([-5, 5])
 ax2.set_zlim([0, 10])
 ax2.legend()
+
+print(len(initial_conditions))
+print(kite.num_elements)
+# print(kite.KC0)
 plt.show()
 
 

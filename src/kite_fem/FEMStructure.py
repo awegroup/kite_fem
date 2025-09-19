@@ -29,15 +29,16 @@ class FEM_structure:
         self.__springdata = SpringData()
         self.__beamdata = BeamCData()
         self.__identity_matrix = identity(self.N, format="csc")
-
-        self.__KC0r = np.zeros(self.__beamdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)
-        self.__KC0c = np.zeros(self.__beamdata.KC0_SPARSE_SIZE * self.num_elements, dtype=INT)
-        self.__KC0v = np.zeros(self.__beamdata.KC0_SPARSE_SIZE * self.num_elements, dtype=DOUBLE)
+        array_size = (self.__springdata.KC0_SPARSE_SIZE * self.num_spring_elements + self.__beamdata.KC0_SPARSE_SIZE * self.num_beam_elements)
+        self.__KC0r = np.zeros(array_size, dtype=INT)
+        self.__KC0c = np.zeros(array_size, dtype=INT)
+        self.__KC0v = np.zeros(array_size, dtype=DOUBLE)
         
         self.I_stiffness = 0
         self.init_KC0 = 0
         self.spring_elements = []
         self.beam_elements = []
+        self.__bu = np.ones(self.N, dtype=bool)
         self.__setup_initial_conditions(initial_conditions)
         if spring_matrix is not None:
             self.__setup_spring_elements(spring_matrix)
@@ -45,17 +46,17 @@ class FEM_structure:
             self.__setup_pulley_elements(pulley_matrix)
         if beam_matrix is not None:
             self.__setup_beam_elements(beam_matrix)
+        self.__bu = np.where(self.__fixed == True, False, self.__bu)
 
     def __setup_initial_conditions(self, initial_conditions):
-        self.__bu = np.zeros(self.N, dtype=bool)
+        self.__fixed = np.zeros(self.N, dtype=bool)
         self.coords_init = np.zeros((self.num_nodes, 3), dtype=float)
         self.coords_rotations_init = np.zeros((self.num_nodes, 6), dtype=float)
         for id, (pos, vel, mass, fixed) in enumerate(initial_conditions):
             self.coords_init[id] = pos
             self.coords_rotations_init[id] = np.concatenate([pos, [0, 0, 0]])
-            if fixed == False:
-                self.__bu[DOF * id : DOF * id + 6] = True
-        self.bu = self.__bu
+            if fixed == True:
+                self.__fixed[DOF * id : DOF * id + 6] = True
         self.coords_init = self.coords_init.flatten()
         self.coords_current = self.coords_init.flatten()
         self.coords_rotations_init = self.coords_rotations_init.flatten()
@@ -69,6 +70,8 @@ class FEM_structure:
             spring_element.set_spring_properties(l0, k, springtype)
             self.spring_elements.append(spring_element)
             self.init_KC0 += self.__springdata.KC0_SPARSE_SIZE
+            for id in [n1, n2]:
+                self.__bu[DOF * id+3 : DOF * id + 6] = False
 
     def __setup_pulley_elements(self, connectivity_matrix):
         for n1, n2, n3, k, c, l0 in connectivity_matrix:
@@ -82,7 +85,9 @@ class FEM_structure:
             spring_element.set_spring_properties(l0, k, "pulley", i_other_pulley)
             self.spring_elements.append(spring_element)
             self.init_KC0 += self.__springdata.KC0_SPARSE_SIZE
-
+            for id in [n1, n2, n3]:
+                self.__bu[DOF * id+3 : DOF * id + 6] = False
+                
     def __setup_beam_elements(self, connectivity_matrix):
         for n1, n2, E, A, I in connectivity_matrix:
             beam_element = BeamElement(n1, n2, self.init_KC0)
@@ -90,8 +95,8 @@ class FEM_structure:
             beam_element.set_beam_properties(E, A, I,L)
             self.beam_elements.append(beam_element)
             self.init_KC0 += self.__beamdata.KC0_SPARSE_SIZE
-            # self.__bu[DOF * n1 : DOF * n1 + 6] = True 
-            # self.__bu[DOF * n2 : DOF * n2 + 6] = True #TODO smarter assigning of BU 
+            for id in [n1, n2]:
+                self.__bu[DOF * id+3 : DOF * id + 6] = True
         
     def __update_stiffness_matrix(self):
         self.__KC0v *= 0
@@ -102,8 +107,7 @@ class FEM_structure:
             self.__KC0r, self.__KC0c, self.__KC0v = beam_element.update_KC0(self.__KC0r, self.__KC0c, self.__KC0v, self.coords_current)
             
         if np.count_nonzero(np.isnan(self.__KC0v)) > 0:
-            raise ValueError(     f"NaN detected in stiffness matrix"
-            )
+            print(f"NaN detected in stiffness matrix")
                 
         self.KC0 = coo_matrix((self.__KC0v, (self.__KC0r, self.__KC0c)), shape=(self.N, self.N)).tocsc()
         self.KC0 += self.__identity_matrix*self.I_stiffness

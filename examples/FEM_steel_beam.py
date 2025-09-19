@@ -9,6 +9,8 @@ elements = 3
 for i in range(elements+1):
     initital_conditions.append([[i*length/elements, 0.0, 0.0], [0, 0, 0], 1, True if i==0 else False])
 
+initital_conditions.append([[length, -1.0, 0.0], [0, 0, 0], 1, False])
+
 load_param = 1#
 E = 210e5 # Pa
 I = 1.6e-5  # m^4
@@ -21,7 +23,12 @@ beam_matrix = []
 for i in range(elements):
     beam_matrix.append([i, i+1, E, A, I])
 
-steel_beam = FEM_structure(initital_conditions, beam_matrix=beam_matrix)
+spring_matrix = []
+
+spring_matrix.append([3, 4, 10, 0, 1, "default"])
+
+steel_beam = FEM_structure(initital_conditions, beam_matrix=beam_matrix,spring_matrix=spring_matrix)
+
 tip_load = load_param*E*I/(length**2)
 fe = np.zeros(steel_beam.N)
 print('tip_load', tip_load, "N")
