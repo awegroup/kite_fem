@@ -190,60 +190,64 @@ KGuu = KG[bu, :][:, bu]
 KC0_suu = KC0_s[bu, :][:, bu]
 Ktuu = KC0uu
 residual = fext - fint
-max_iterations = 10
+max_iterations = 1
 u = np.zeros(N)
-du = np.zeros(N)
-xyz = np.zeros(N, dtype=bool)
-xyz[0::DOF] = xyz[1::DOF] = xyz[2::DOF] = True
-fig, ax = plt.subplots()
-for iteration in range(max_iterations+1):
-    print("residual norm", np.linalg.norm(residual[bu]))
-    if np.linalg.norm(residual[bu]) < 1 and iteration > 0:
-        print(f'Converged after {iteration} iterations')
-        break
+u[bu] = np.linalg.solve(Ktuu.toarray(), fext[bu])
+
+
+print(u)
+# du = np.zeros(N)
+# xyz = np.zeros(N, dtype=bool)
+# xyz[0::DOF] = xyz[1::DOF] = xyz[2::DOF] = True
+# fig, ax = plt.subplots()
+# for iteration in range(max_iterations+1):
+#     print("residual norm", np.linalg.norm(residual[bu]))
+#     if np.linalg.norm(residual[bu]) < 1 and iteration > 0:
+#         print(f'Converged after {iteration} iterations')
+#         break
     
-    du = .05*lsqr(Ktuu, residual[bu])[0]
-    u[bu] += np.clip(du, -.1, .1)  
-    ncoords_current = ncoords_flatten + u[xyz]
+#     du = lsqr(Ktuu, residual[bu])[0]
+#     u[bu] += du
+#     ncoords_current = ncoords_flatten + u[xyz]
 
-    fint_beam = np.zeros(N)
-    fint_spring = np.zeros(N)
-    # KC0v *= 0
-    # KGv *= 0
-    for beam,spring in zip(beams, springs):
-        unit_vect, l = unit_vector(beam, ncoords_current)
-        xi, xj ,xk = unit_vect[0], unit_vect[1], unit_vect[2]      
-        vxyi, vxyj, vxyk =  unit_vect[1], unit_vect[2], unit_vect[0] 
-        if xi == xj  and xj == xk: # Edge case, if all are the same then KC0 returns NaN's
-            vxyi *= -1
-        beam.update_rotation_matrix(vxyi, vxyj, vxyk, ncoords_current)
-        beam.update_probe_ue(u)
-        # beam.update_probe_xe(ncoords_current)
-        # beam.update_KC0(KC0r, KC0c, KC0v, prop)
-        # beam.update_KG(KGr, KGc, KGv, prop)
-        beam.update_fint(fint_beam, prop)
-        spring.update_rotation_matrix(xi, xj, xk, vxyi, vxyj, vxyk)
-        spring.update_probe_ue(u)
-        spring.update_KC0(KC0r_s, KC0c_s, KC0v_s)
-        spring.update_fint(fint_spring)
-    fint = fint_beam
-    KC0 = coo_matrix((KC0v, (KC0r, KC0c)), shape=(N, N)).tocsc()
-    KC0_s = coo_matrix((KC0v_s, (KC0r_s, KC0c_s)), shape=(N, N)).tocsc()
-    KG = coo_matrix((KGv, (KGr, KGc)), shape=(N, N)).tocsc()
-    KC0uu = KC0[bu, :][:, bu]   
-    KGuu = KG[bu, :][:, bu]
-    KC0_suu = KC0_s[bu, :][:, bu]
-    Ktuu = KC0uu 
-    residual = fext - fint
+#     fint_beam = np.zeros(N)
+#     fint_spring = np.zeros(N)
+#     # KC0v *= 0
+#     # KGv *= 0
+#     for beam,spring in zip(beams, springs):
+#         unit_vect, l = unit_vector(beam, ncoords_current)
+#         xi, xj ,xk = unit_vect[0], unit_vect[1], unit_vect[2]      
+#         vxyi, vxyj, vxyk =  unit_vect[1], unit_vect[2], unit_vect[0] 
+#         if xi == xj  and xj == xk: # Edge case, if all are the same then KC0 returns NaN's
+#             vxyi *= -1
+#         beam.update_rotation_matrix(vxyi, vxyj, vxyk, ncoords_current)
+#         beam.update_probe_ue(u)
+#         # beam.update_probe_xe(ncoords_current)
+#         # beam.update_KC0(KC0r, KC0c, KC0v, prop)
+#         # beam.update_KG(KGr, KGc, KGv, prop)
+#         beam.update_fint(fint_beam, prop)
+#         spring.update_rotation_matrix(xi, xj, xk, vxyi, vxyj, vxyk)
+#         spring.update_probe_ue(u)
+#         spring.update_KC0(KC0r_s, KC0c_s, KC0v_s)
+#         spring.update_fint(fint_spring)
+#     fint = fint_beam
+#     KC0 = coo_matrix((KC0v, (KC0r, KC0c)), shape=(N, N)).tocsc()
+#     KC0_s = coo_matrix((KC0v_s, (KC0r_s, KC0c_s)), shape=(N, N)).tocsc()
+#     KG = coo_matrix((KGv, (KGr, KGc)), shape=(N, N)).tocsc()
+#     KC0uu = KC0[bu, :][:, bu]   
+#     KGuu = KG[bu, :][:, bu]
+#     KC0_suu = KC0_s[bu, :][:, bu]
+#     Ktuu = KC0uu 
+#     residual = fext - fint
     
-    fig,ax = plot(fig, ax)
+#     fig,ax = plot(fig, ax)
     
-fig,ax = plot(fig, ax, c='red')
+# fig,ax = plot(fig, ax, c='red')
 
-ax.scatter(L*(1-uL),-L*(wL), color='red', label='Target Deflection')
+# ax.scatter(L*(1-uL),-L*(wL), color='red', label='Target Deflection')
 
 
-plt.show()
+# plt.show()
     
 
 

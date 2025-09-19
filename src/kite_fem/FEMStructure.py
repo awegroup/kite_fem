@@ -25,6 +25,7 @@ class FEM_structure:
         self.__xyz[0::DOF] = self.__xyz[1::DOF] = self.__xyz[2::DOF] = True
         self.fe = np.zeros(self.N, dtype=DOUBLE)
         self.fi = np.zeros(self.N, dtype=DOUBLE)
+        self.fi_beams = np.zeros(self.N, dtype=DOUBLE)
         self.__springdata = SpringData()
         self.__beamdata = BeamCData()
         self.__identity_matrix = identity(self.N, format="csc")
@@ -59,7 +60,7 @@ class FEM_structure:
         self.coords_current = self.coords_init.flatten()
         self.coords_rotations_init = self.coords_rotations_init.flatten()
         self.coords_rotations_current = self.coords_rotations_init.flatten()
-
+        self.coords_rotations_previous = self.coords_rotations_init.flatten()
         
     def __setup_spring_elements(self, connectivity_matrix):
         for n1, n2, k, c, l0, springtype in connectivity_matrix:
@@ -122,12 +123,12 @@ class FEM_structure:
             bu2 = self.__bu[spring_element.spring.c2 : spring_element.spring.c2 + DOF]
             self.fi[spring_element.spring.n1 * DOF : (spring_element.spring.n1 + 1) * DOF] -= (fi_element * bu1)
             self.fi[spring_element.spring.n2 * DOF : (spring_element.spring.n2 + 1) * DOF] += (fi_element * bu2)
-            
+
+        dif = self.coords_rotations_current - self.coords_rotations_previous
         for beam_element in self.beam_elements:
-            self.fi = beam_element.beam_internal_forces(self.fi,self.coords_rotations_current,self.coords_current)
-
-
-        
+            self.fi_beams = beam_element.beam_internal_forces(self.fi_beams,dif,self.coords_current)
+            
+        self.fi += self.fi_beams
         
     def solve(
         self,
@@ -155,7 +156,9 @@ class FEM_structure:
         relax = relax_init
         for iteration in range(max_iterations + 1):
             t0 = time.perf_counter()
+
             self.__update_internal_forces()
+
             timings["update_internal_forces"] += time.perf_counter() - t0
 
             if iteration % k_update == 0:
@@ -200,6 +203,7 @@ class FEM_structure:
             displacement[self.__bu] += np.clip(
                 displacement_delta * relax, -step_limit, step_limit
             )
+            self.coords_rotations_previous = self.coords_rotations_current
             self.coords_rotations_current = self.coords_rotations_init + displacement
             self.coords_current = self.coords_rotations_current[self.__xyz]
 
@@ -290,7 +294,7 @@ class FEM_structure:
             self.__update_stiffness_matrix()
             residual = self.fe - self.fi
             displacement = lsqr(self.KC0, residual)[0]
-            scale = 150
+            scale = 250
             for node in range(self.num_nodes):
                 coords = self.coords_current[node * DOF // 2 : node * DOF // 2 + 3]
                 residual_vector = coords + residual[DOF * node : DOF * node + 3] / scale

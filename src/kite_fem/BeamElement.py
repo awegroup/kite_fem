@@ -20,11 +20,11 @@ class BeamElement:
         G = E/(2*(1+0.3))
         self.prop.G = G
         self.prop.A = A
-        self.prop.Ay = A*0.886
-        self.prop.Az = A*0.886
+        # self.prop.Ay = A*0.886
+        # self.prop.Az = A*0.886
         self.prop.Iyy = I
         self.prop.Izz = I
-        self.prop.Iyz = 0.0
+        # self.prop.Iyz = 0.0
         self.prop.J = 2*I
         # rho = 1
         # self.prop.intrho = A*rho
