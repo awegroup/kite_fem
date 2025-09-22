@@ -2,19 +2,49 @@ import matplotlib.pyplot as plt
 import numpy as np
 from kite_fem.FEMStructure import FEM_structure
 
+def F_inflatablebeam(p, r, v):
+    # Coefficients
+    C1 = 6582.82
+    C2 = -272.43
+    C3 = 40852.38
+    C4 = 14.31
+    C5 = 271865251.42
+    C6 = 215.93
+    C7 = 14021.79
+    C8 = -589.05
+    
+    # Numerator and denominator
+    denom = (C1 * r + C2) * p**2 + (C3 * r**3 + C4)
+    numer = (C5 * r**5 + C6) * p + (C7 * r + C8)
+    
+    # Formula
+    result = denom * (1 - np.exp(-(numer / denom) * v))
+    return result
+
+
 initital_conditions = []
 length = 10 #m
-elements = 3
+elements = 7
+
 
 for i in range(elements+1):
     initital_conditions.append([[i*length/elements, 0.0, 0.0], [0, 0, 0], 1, True if i==0 else False])
 
 load_param = 1.5#
-E = 210e5 # Pa
-I = 1.6e-5  # m^4
-A = 1 # m^2
-print("E*I", E*I)
+t = 0.001
+d = 0.18
+r = d/2
+p = 0.5
+v= 0.03
 L = length/elements #m
+
+EI = F_inflatablebeam(p,r,v)*length/(3*v)
+A = np.pi*(r**2 - (r-t)**2)  # m^2
+I = (np.pi/4)*(r**4 - (r-t)**4)  # m^4
+E = EI/I
+
+
+print("E*I", E*I)
 
 beam_matrix = []
 

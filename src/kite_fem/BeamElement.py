@@ -32,7 +32,10 @@ class BeamElement:
         # self.prop.intrhoz2 = I*rho 
         # self.prop.intrhoyz = 0
         self.beam.length = L
-
+    
+    def update_inflatable_beam_properties(self, d, p,coords: np.ndarray):
+        
+    
     def unit_vector(self, coords : np.ndarray):
         xi = coords[self.beam.c2//2 + 0] - coords[self.beam.c1//2 + 0]
         xj = coords[self.beam.c2//2 + 1] - coords[self.beam.c1//2 + 1]

@@ -131,7 +131,7 @@ class FEM_structure:
         dif = self.coords_rotations_current - self.coords_rotations_previous
         for beam_element in self.beam_elements:
             self.fi_beams = beam_element.beam_internal_forces(self.fi_beams,dif,self.coords_current)
-            
+
         self.fi += self.fi_beams
         
     def solve(
@@ -221,9 +221,12 @@ class FEM_structure:
         return
 
     def reinitialise(self):
-        self.coords_init = self.coords_current
-        # add rotational DOF's for beam?
-
+        self.coords_current = self.coords_init
+        self.coords_rotations_current = self.coords_rotations_init
+        self.coords_rotations_previous = self.coords_rotations_init
+        self.fi_beams = np.zeros(self.N, dtype=DOUBLE)
+        
+        
     def plot_3D(
         self, color, ax=None, fig=None, plot_forces_displacements=False, fe=None
     ):
