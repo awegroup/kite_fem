@@ -227,8 +227,8 @@ class FEM_structure:
         self.fi_beams = np.zeros(self.N, dtype=DOUBLE)
         
         
-    def plot_3D(
-        self, color, ax=None, fig=None, plot_forces_displacements=False, fe=None
+    def plot_3D( 
+        self, color="blue", ax=None, fig=None, plot_forces_displacements=False, fe=None
     ):
         if fig is None:
             fig = plt.figure()
