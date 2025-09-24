@@ -220,15 +220,16 @@ class FEM_structure:
             print(f"  {k:22s}: {v:.4f} / {v/iters:.6f}")
         return
 
+    #Add reinitialise function, two way
     def reinitialise(self):
         self.coords_current = self.coords_init
         self.coords_rotations_current = self.coords_rotations_init
         self.coords_rotations_previous = self.coords_rotations_init
         self.fi_beams = np.zeros(self.N, dtype=DOUBLE)
         
-        
-    def plot_3D( 
-        self, color="blue", ax=None, fig=None, plot_forces_displacements=False, fe=None
+
+    def plot_3D(
+        self, color="blue", ax=None, fig=None, plot_forces_displacements=False, fe=None, show_plot=True, show_legend=True
     ):
         if fig is None:
             fig = plt.figure()
@@ -338,13 +339,30 @@ class FEM_structure:
                     label="External Force Vector" if node == 0 else None,
                 )
         ax.set(xlabel="X", ylabel="Y", zlabel="Z")
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        zlim = ax.get_zlim()
+        xmid = (xlim[0] + xlim[1]) / 2
+        ymid = (ylim[0] + ylim[1]) / 2
+        zmid = (zlim[0] + zlim[1]) / 2
+        maximum = max(xlim[1]-xlim[0], ylim[1]-ylim[0], zlim[1]-zlim[0])
+        ax.set_xlim([xmid - maximum / 2, xmid + maximum / 2])
+        ax.set_ylim([ymid - maximum / 2, ymid + maximum / 2])
+        ax.set_zlim([zmid - maximum / 2, zmid + maximum / 2])
+        ax.set_box_aspect([1, 1, 1])
+        if show_legend:
+            ax.legend()
+        if show_plot:
+            plt.show()
         return ax, fig
 
-    def plot_convergence(self, ax=None, fig=None):
+    def plot_convergence(self, ax=None, fig=None, show_plot=True):
         if fig is None:
             fig = plt.figure()
         if ax is None:
             ax = fig.add_subplot(111)
         ax.plot(self.iteration_history, self.residual_norm_history)
         ax.set(xlabel="Iteration", ylabel="Residual")
+        if show_plot:
+            plt.show()
         return ax, fig

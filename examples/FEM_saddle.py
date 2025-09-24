@@ -127,14 +127,3 @@ SaddleForm.solve(
 ax2, fig2 = SaddleForm.plot_3D(color="blue", plot_forces_displacements=False)
 ax3, fig3 = SaddleForm.plot_convergence()
 
-ax1.legend()
-ax1.set_xlim([-1, 11])
-ax1.set_ylim([-1, 11])
-ax1.set_zlim([-1, 6])
-
-ax2.legend()
-ax2.set_xlim([-1, 11])
-ax2.set_ylim([-1, 11])
-ax2.set_zlim([-1, 6])
-
-plt.show()

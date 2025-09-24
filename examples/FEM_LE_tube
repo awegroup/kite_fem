@@ -56,10 +56,10 @@ steel_beam = FEM_structure(initital_conditions, beam_matrix=beam_matrix)
 tip_load = load_param*E*I/(length**2)
 fe = np.zeros(steel_beam.N)
 print('tip_load', tip_load, "N")
-load = 10000 #N
+load = 1000 #N
 uniform_load = load/(1+elements)
 fe[1::6] = uniform_load
-ax,fig = steel_beam.plot_3D(color= "blue")
+ax,fig = steel_beam.plot_3D(color= "blue",show_plot=False)
 
 
 steel_beam.solve(        fe=fe,
@@ -69,14 +69,11 @@ steel_beam.solve(        fe=fe,
         relax_init=1,
         relax_update=0.95,
         k_update=1,
-        I_stiffness=250
+        I_stiffness=25
         )
 
-ax,fig = steel_beam.plot_3D(ax=ax, fig=fig, color="red",plot_forces_displacements=False)
+ax,fig = steel_beam.plot_3D(ax=ax, fig=fig, color="red",plot_forces_displacements=False,show_plot=False)
 ax2,fig2 = steel_beam.plot_convergence()
-ax.set_xlim([0, 10])
-ax.set_ylim([-10, 0])
-ax.set_zlim([-5, 5])
 
 print("Tip displacements")
 print("load_param", load_param)

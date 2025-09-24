@@ -57,7 +57,7 @@ tip_load = load_param*E*I/(length**2)
 fe = np.zeros(steel_beam.N)
 print('tip_load', tip_load, "N")
 fe[1::6][-1] = -tip_load
-ax,fig = steel_beam.plot_3D(color= "blue")
+ax,fig = steel_beam.plot_3D(color= "blue",show_plot=False)
 
 
 steel_beam.solve(        fe=fe,
@@ -67,14 +67,12 @@ steel_beam.solve(        fe=fe,
         relax_init=1,
         relax_update=0.95,
         k_update=1,
-        I_stiffness=25
+        I_stiffness=50
         )
 
-ax,fig = steel_beam.plot_3D(ax=ax, fig=fig, color="red",plot_forces_displacements=False)
+ax,fig = steel_beam.plot_3D(ax=ax, fig=fig, color="red",plot_forces_displacements=False,show_plot=False)
 ax2,fig2 = steel_beam.plot_convergence()
-ax.set_xlim([0, 10])
-ax.set_ylim([-10, 0])
-ax.set_zlim([-5, 5])
+
 
 print("Tip displacements")
 print("load_param", load_param)
