@@ -33,7 +33,6 @@ class FEM_structure:
         self.__KC0r = np.zeros(array_size, dtype=INT)
         self.__KC0c = np.zeros(array_size, dtype=INT)
         self.__KC0v = np.zeros(array_size, dtype=DOUBLE)
-        
         self.I_stiffness = 0
         self.init_KC0 = 0
         self.spring_elements = []
@@ -162,7 +161,6 @@ class FEM_structure:
             t0 = time.perf_counter()
 
             self.__update_internal_forces()
-
             timings["update_internal_forces"] += time.perf_counter() - t0
 
             if iteration % k_update == 0:
@@ -218,16 +216,23 @@ class FEM_structure:
         print("Timing summary (total / per-iter) [s]:")
         for k, v in timings.items():
             print(f"  {k:22s}: {v:.4f} / {v/iters:.6f}")
+
+
         return
 
     def reset(self):
         for beam_element in self.beam_elements:
-            beam_element.beam.probe.ue[0]*=0
+            beam_element.beam.probe.ue=beam_element.beam.probe.ue*0
             beam_element.fi *=0
         self.coords_current = self.coords_init
         self.coords_rotations_current = self.coords_rotations_init
         self.coords_rotations_previous = self.coords_rotations_init
 
+    def reinitialise(self):
+        self.coords_init = self.coords_current
+        self.coords_rotations_init = self.coords_rotations_current
+        self.coords_rotations_previous = self.coords_rotations_current
+        self.reinitialised = True
 
     def plot_3D(
         self, color="blue", ax=None, fig=None, plot_forces_displacements=False, fe=None, show_plot=True, show_legend=True
