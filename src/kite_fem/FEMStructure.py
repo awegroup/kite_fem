@@ -90,7 +90,7 @@ class FEM_structure:
                 
     def __setup_beam_elements(self, connectivity_matrix):
         for n1, n2, E, A, I in connectivity_matrix:
-            beam_element = BeamElement(n1, n2, self.init_KC0)
+            beam_element = BeamElement(n1, n2, self.init_KC0,self.N)
             L = beam_element.unit_vector(self.coords_init)[1]
             beam_element.set_beam_properties(E, A, I,L)
             self.beam_elements.append(beam_element)
@@ -115,7 +115,7 @@ class FEM_structure:
 
     def __update_internal_forces(self):
         self.fi = np.zeros(self.N, dtype=DOUBLE)
-        
+        self.fi_beams = np.zeros(self.N, dtype=DOUBLE)
         for spring_element in self.spring_elements:
             if spring_element.springtype == "pulley":
                 other_element = self.spring_elements[spring_element.i_other_pulley]
@@ -130,7 +130,7 @@ class FEM_structure:
 
         dif = self.coords_rotations_current - self.coords_rotations_previous
         for beam_element in self.beam_elements:
-            self.fi_beams = beam_element.beam_internal_forces(self.fi_beams,dif,self.coords_current)
+            self.fi_beams += beam_element.beam_internal_forces(dif,self.coords_current)
 
         self.fi += self.fi_beams
         
@@ -220,13 +220,14 @@ class FEM_structure:
             print(f"  {k:22s}: {v:.4f} / {v/iters:.6f}")
         return
 
-    #Add reinitialise function, two way
-    def reinitialise(self):
+    def reset(self):
+        for beam_element in self.beam_elements:
+            beam_element.beam.probe.ue[0]*=0
+            beam_element.fi *=0
         self.coords_current = self.coords_init
         self.coords_rotations_current = self.coords_rotations_init
         self.coords_rotations_previous = self.coords_rotations_init
-        self.fi_beams = np.zeros(self.N, dtype=DOUBLE)
-        
+
 
     def plot_3D(
         self, color="blue", ax=None, fig=None, plot_forces_displacements=False, fe=None, show_plot=True, show_legend=True

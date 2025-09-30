@@ -4,13 +4,12 @@ from kite_fem.FEMStructure import FEM_structure
 
 initital_conditions = []
 length = 10 #m
-elements = 4
+elements = 1
 
 for i in range(elements+1):
     initital_conditions.append([[i*length/elements, 0.0, 0.0], [0, 0, 0], 1, True if i==0 else False])
 
-for i in range(1,2):
-    initital_conditions.append([[length,0.0,  i*length/elements], [0, 0, 0], 1, False])
+
 load_param = 1.5#
 E = 210e5 # Pa
 I = 1.6e-5  # m^4
@@ -20,7 +19,7 @@ L = length/elements #m
 
 beam_matrix = []
 
-for i in range(elements+1):
+for i in range(elements):
     beam_matrix.append([i, i+1, E, A, I])
 
 steel_beam = FEM_structure(initital_conditions, beam_matrix=beam_matrix)
@@ -32,7 +31,7 @@ fe[1::6][-1] = -tip_load
 ax,fig = steel_beam.plot_3D(color= "blue",show_plot=False)
 
 
-steel_beam.solve(        fe=fe,
+steel_beam.solve(        fe=-fe,
         max_iterations=2000,
         tolerance=0.1,
         step_limit=2,
@@ -43,7 +42,22 @@ steel_beam.solve(        fe=fe,
         )
 
 ax,fig = steel_beam.plot_3D(ax=ax, fig=fig, color="red",plot_forces_displacements=False,show_plot=False)
-ax2,fig2 = steel_beam.plot_convergence()
+
+steel_beam.reset()
+
+steel_beam.solve(        fe=fe,
+        max_iterations=2000,
+        tolerance=0.1,
+        step_limit=2,
+        relax_init=1,
+        relax_update=0.95,
+        k_update=1,
+        I_stiffness=25
+        )
+
+
+ax,fig = steel_beam.plot_3D(ax=ax, fig=fig, color="green",plot_forces_displacements=False,show_plot=False)
+
 
 print("Tip displacements")
 print("load_param", load_param)
