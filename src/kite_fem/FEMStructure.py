@@ -38,6 +38,8 @@ class FEM_structure:
         self.spring_elements = []
         self.beam_elements = []
         self.__bu = np.ones(self.N, dtype=bool)
+        self.reinitialised = False
+
         self.__setup_initial_conditions(initial_conditions)
         if spring_matrix is not None:
             self.__setup_spring_elements(spring_matrix)
@@ -115,6 +117,7 @@ class FEM_structure:
     def __update_internal_forces(self):
         self.fi = np.zeros(self.N, dtype=DOUBLE)
         self.fi_beams = np.zeros(self.N, dtype=DOUBLE)
+
         for spring_element in self.spring_elements:
             if spring_element.springtype == "pulley":
                 other_element = self.spring_elements[spring_element.i_other_pulley]
@@ -129,7 +132,7 @@ class FEM_structure:
 
         dif = self.coords_rotations_current - self.coords_rotations_previous
         for beam_element in self.beam_elements:
-            self.fi_beams += beam_element.beam_internal_forces(dif,self.coords_current)
+            self.fi_beams += beam_element.beam_internal_forces(dif,self.coords_current,self.coords_rotations_previous[self.__xyz])
 
         self.fi += self.fi_beams
         
@@ -160,14 +163,23 @@ class FEM_structure:
         for iteration in range(max_iterations + 1):
             t0 = time.perf_counter()
 
-            self.__update_internal_forces()
-            timings["update_internal_forces"] += time.perf_counter() - t0
 
+            self.__update_internal_forces()
+
+            
+            timings["update_internal_forces"] += time.perf_counter() - t0
+            
             if iteration % k_update == 0:
                 t0 = time.perf_counter()
                 self.__update_stiffness_matrix()
                 timings["update_stiffness"] += time.perf_counter() - t0
+                
 
+
+            # if iteration == 0:
+            #     print(self.fe)
+            #     print(self.fi)
+            
             residual = self.fe - self.fi
             residual_norm = np.linalg.norm(residual[self.__bu])
             self.residual_norm_history.append(residual_norm)
@@ -205,6 +217,7 @@ class FEM_structure:
             displacement[self.__bu] += np.clip(
                 displacement_delta * relax, -step_limit, step_limit
             )
+                
             self.coords_rotations_previous = self.coords_rotations_current
             self.coords_rotations_current = self.coords_rotations_init + displacement
             self.coords_current = self.coords_rotations_current[self.__xyz]
@@ -228,10 +241,15 @@ class FEM_structure:
         self.coords_rotations_previous = self.coords_rotations_init
 
     def reinitialise(self):
-        self.coords_init = self.coords_current
-        self.coords_rotations_init = self.coords_rotations_current
-        self.coords_rotations_previous = self.coords_rotations_current
         self.reinitialised = True
+        self.displacement_init =  self.coords_rotations_current - self.coords_rotations_init
+
+        for beam_element in self.beam_elements:
+            beam_element.reset()
+
+        self.coords_rotations_current = self.coords_rotations_init + self.displacement_init
+        self.coords_current = self.coords_init + self.displacement_init[self.__xyz]
+        self.coords_rotations_previous = self.coords_rotations_init
 
     def plot_3D(
         self, color="blue", ax=None, fig=None, plot_forces_displacements=False, fe=None, show_plot=True, show_legend=True

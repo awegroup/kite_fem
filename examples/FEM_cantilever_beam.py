@@ -4,7 +4,7 @@ from kite_fem.FEMStructure import FEM_structure
 
 initital_conditions = []
 length = 10 #m
-elements = 5
+elements = 1
 
 for i in range(elements+1):
     initital_conditions.append([[i*length/elements, 0.0, 0.0], [0, 0, 0], 1, True if i==0 else False])
@@ -42,12 +42,16 @@ steel_beam.solve(        fe=fe,
         )
 
 ax,fig = steel_beam.plot_3D(ax=ax, fig=fig, color="red",plot_forces_displacements=False,show_plot=False)
-
-    
+# print(np.array(steel_beam.beam_elements[0].beam.probe.ue))
+# print(steel_beam.residual_norm_history[-1])
+# steel_beam.reinitialise()
+# print(steel_beam.fi)
 steel_beam.reset()
+# print(steel_beam.residual_norm_history[0])
 
+# steel_beam.reset()
 
-steel_beam.solve(        fe=-fe,
+steel_beam.solve(   fe=-fe ,   
         max_iterations=2000,
         tolerance=0.1,
         step_limit=2,
