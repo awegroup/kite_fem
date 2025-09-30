@@ -20,6 +20,8 @@ kite.solve(fe=fe, max_iterations=1000, tolerance=1, step_limit=0.1, relax_init=.
 ax2,fig2 = kite.plot_3D(color='red',plot_forces_displacements=False,show_plot=False)
 ax3, fig3 = kite.plot_convergence()
 
+rest_lengths = kite.modify_spring_rest_length()
+print(rest_lengths)
 plt.show()
 
 

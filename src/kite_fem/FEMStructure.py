@@ -26,6 +26,8 @@ class FEM_structure:
         self.fe = np.zeros(self.N, dtype=DOUBLE)
         self.fi = np.zeros(self.N, dtype=DOUBLE)
         self.fi_beams = np.zeros(self.N, dtype=DOUBLE)
+        self.fi_reinit = np.zeros(self.N, dtype=DOUBLE)
+        self.displacement_reinit = np.zeros(self.N, dtype=DOUBLE)
         self.__springdata = SpringData()
         self.__beamdata = BeamCData()
         self.__identity_matrix = identity(self.N, format="csc")
@@ -38,7 +40,6 @@ class FEM_structure:
         self.spring_elements = []
         self.beam_elements = []
         self.__bu = np.ones(self.N, dtype=bool)
-        self.reinitialised = False
 
         self.__setup_initial_conditions(initial_conditions)
         if spring_matrix is not None:
@@ -48,6 +49,13 @@ class FEM_structure:
         if beam_matrix is not None:
             self.__setup_beam_elements(beam_matrix)
         self.__bu = np.where(self.__fixed == True, False, self.__bu)
+
+    
+    def modify_spring_rest_length(self, spring_id = None, new_l0 = None):
+        if spring_id is not None and new_l0 is not None:
+            self.spring_elements[spring_id].spring.l0 = new_l0
+        rest_lengths = np.array([spring.l0 for spring in self.spring_elements])
+        return rest_lengths
 
     def __setup_initial_conditions(self, initial_conditions):
         self.__fixed = np.zeros(self.N, dtype=bool)
@@ -135,6 +143,7 @@ class FEM_structure:
             self.fi_beams += beam_element.beam_internal_forces(dif,self.coords_current,self.coords_rotations_previous[self.__xyz])
 
         self.fi += self.fi_beams
+        self.fi += self.fi_reinit
         
     def solve(
         self,
@@ -174,12 +183,6 @@ class FEM_structure:
                 self.__update_stiffness_matrix()
                 timings["update_stiffness"] += time.perf_counter() - t0
                 
-
-
-            # if iteration == 0:
-            #     print(self.fe)
-            #     print(self.fi)
-            
             residual = self.fe - self.fi
             residual_norm = np.linalg.norm(residual[self.__bu])
             self.residual_norm_history.append(residual_norm)
@@ -189,12 +192,14 @@ class FEM_structure:
                 print(
                     f"Converged after {iteration} iterations. Residual: {residual_norm}"
                 )
+                converged = True
                 break
 
             if iteration == max_iterations:
                 print(
                     f"Did not converge after {max_iterations} iterations. Residual: {residual_norm}"
                 )
+                converged = False
                 break
 
             if iteration > 10 and self.residual_norm_history[-1] >= min(
@@ -222,6 +227,9 @@ class FEM_structure:
             self.coords_rotations_current = self.coords_rotations_init + displacement
             self.coords_current = self.coords_rotations_current[self.__xyz]
 
+        # self.coords_rotations_current += self.displacement_reinit
+        # self.coords_current = self.coords_rotations_current[self.__xyz]
+            
         end_time = time.perf_counter()
         total = end_time - start_time
         print(f"Solver time: {total:.4f} s")
@@ -231,7 +239,7 @@ class FEM_structure:
             print(f"  {k:22s}: {v:.4f} / {v/iters:.6f}")
 
 
-        return
+        return converged
 
     def reset(self):
         for beam_element in self.beam_elements:
@@ -242,14 +250,9 @@ class FEM_structure:
 
     def reinitialise(self):
         self.reinitialised = True
-        self.displacement_init =  self.coords_rotations_current - self.coords_rotations_init
-
-        for beam_element in self.beam_elements:
-            beam_element.reset()
-
-        self.coords_rotations_current = self.coords_rotations_init + self.displacement_init
-        self.coords_current = self.coords_init + self.displacement_init[self.__xyz]
-        self.coords_rotations_previous = self.coords_rotations_init
+        self.displacement_reinit =  self.coords_rotations_current
+        self.fi_reinit = self.fi
+        self.reset()
 
     def plot_3D(
         self, color="blue", ax=None, fig=None, plot_forces_displacements=False, fe=None, show_plot=True, show_legend=True
