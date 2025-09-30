@@ -31,7 +31,7 @@ fe[1::6][-1] = -tip_load
 ax,fig = steel_beam.plot_3D(color= "blue",show_plot=False)
 
 
-steel_beam.solve(        fe=-fe,
+steel_beam.solve(        fe=fe,
         max_iterations=2000,
         tolerance=0.1,
         step_limit=2,
@@ -47,7 +47,7 @@ ax,fig = steel_beam.plot_3D(ax=ax, fig=fig, color="red",plot_forces_displacement
 steel_beam.reset()
 
 
-steel_beam.solve(        fe=fe,
+steel_beam.solve(        fe=-fe,
         max_iterations=2000,
         tolerance=0.1,
         step_limit=2,

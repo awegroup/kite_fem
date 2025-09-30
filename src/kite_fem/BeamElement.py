@@ -58,7 +58,11 @@ class BeamElement:
         self.beam.update_KC0(KC0r, KC0c, KC0v,self.prop,self.update_KC0v_only)
         self.update_KC0v_only = 1
         return KC0r, KC0c, KC0v
-
+    
+    def reset(self):
+        self.beam.probe.ue=np.array(self.beam.probe.ue)*0
+        self.fi *=0
+        
     def beam_internal_forces(self, coords_rotations, coords: np.ndarray):
         self.beam.update_probe_ue(coords_rotations)
         self.__update_rotation_matrix(coords)
