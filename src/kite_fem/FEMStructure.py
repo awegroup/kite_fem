@@ -51,9 +51,9 @@ class FEM_structure:
         self.__bu = np.where(self.__fixed == True, False, self.__bu)
 
     
-    def modify_spring_rest_length(self, spring_id = None, new_l0 = None):
-        if spring_id is not None and new_l0 is not None:
-            self.spring_elements[spring_id].spring.l0 = new_l0
+    def modify_get_spring_rest_length(self, spring_ids = [], new_l0s = []):
+        for spring_id, new_l0 in zip(spring_ids, new_l0s):
+            self.spring_elements[spring_id].l0 = new_l0
         rest_lengths = np.array([spring.l0 for spring in self.spring_elements])
         return rest_lengths
 
