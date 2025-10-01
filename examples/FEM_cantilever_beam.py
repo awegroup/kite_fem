@@ -52,7 +52,7 @@ steel_beam.reset()
 
 # steel_beam.reset()
 
-steel_beam.solve(   fe=0*fe ,   
+steel_beam.solve(   fe=fe ,   
         max_iterations=2000,
         tolerance=0.1,
         step_limit=2,

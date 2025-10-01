@@ -254,7 +254,7 @@ class FEM_structure:
         self.reset()
 
     def plot_3D(
-        self, color="blue", ax=None, fig=None, plot_forces_displacements=False, fe=None, show_plot=True, show_legend=True
+        self, color="blue", ax=None, fig=None, plot_forces_displacements=False, fe=None, show_plot=True, show_legend=True,plot_nodes=True
     ):
         if fig is None:
             fig = plt.figure()
@@ -262,19 +262,20 @@ class FEM_structure:
             ax = fig.add_subplot(111, projection="3d")
         if fe is not None:
             self.fe = fe
-
-        node_types = {True: ("Free Node", color), False: ("Fixed Node", "black")}
-        label_set = {"Free Node": False, "Fixed Node": False}
-        for n in range(self.num_nodes):
-            label, c = node_types[self.__bu[n * DOF]]
-            ax.scatter(
-                self.coords_current[n * DOF // 2],
-                self.coords_current[n * DOF // 2 + 1],
-                self.coords_current[n * DOF // 2 + 2],
-                color=c,
-                label=label if not label_set[label] else None,
-            )
-            label_set[label] = True
+            
+        if plot_nodes:
+            node_types = {True: ("Free Node", color), False: ("Fixed Node", "black")}
+            label_set = {"Free Node": False, "Fixed Node": False}
+            for n in range(self.num_nodes):
+                label, c = node_types[self.__bu[n * DOF]]
+                ax.scatter(
+                    self.coords_current[n * DOF // 2],
+                    self.coords_current[n * DOF // 2 + 1],
+                    self.coords_current[n * DOF // 2 + 2],
+                    color=c,
+                    label=label if not label_set[label] else None,
+                )
+                label_set[label] = True
 
         for i, spring_element in enumerate(self.spring_elements):
             c = color
@@ -302,7 +303,7 @@ class FEM_structure:
             )
 
         for i, beam_element in enumerate(self.beam_elements):
-            c = color
+            c = "green"
             n1 = beam_element.beam.n1
             n2 = beam_element.beam.n2
             ax.plot(

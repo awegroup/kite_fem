@@ -24,7 +24,7 @@ def F_inflatablebeam(p, r, v):
 
 initital_conditions = []
 length = 10 #m
-elements = 7
+elements = 5
 
 
 for i in range(elements+1):
@@ -43,6 +43,7 @@ A = np.pi*(r**2 - (r-t)**2)  # m^2
 I = (np.pi/4)*(r**4 - (r-t)**4)  # m^4
 E = EI/I
 
+print(E)
 
 print("E*I", E*I)
 
@@ -67,7 +68,7 @@ steel_beam.solve(        fe=fe,
         relax_init=1,
         relax_update=0.95,
         k_update=1,
-        I_stiffness=50
+        I_stiffness=25
         )
 
 ax,fig = steel_beam.plot_3D(ax=ax, fig=fig, color="red",plot_forces_displacements=False,show_plot=False)
