@@ -249,7 +249,6 @@ class FEM_structure:
         self.coords_rotations_previous = self.coords_rotations_init
 
     def reinitialise(self):
-        self.reinitialised = True
         self.displacement_reinit =  self.coords_rotations_current
         self.fi_reinit = self.fi
         self.reset()

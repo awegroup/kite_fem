@@ -64,8 +64,8 @@ class BeamElement:
         self.fi *=0
 
     def beam_internal_forces(self, coords_rotations, coords: np.ndarray, coords_previous: np.ndarray):
-        self.beam.probe.ue=np.array(self.beam.probe.ue)*0
-        self.__update_rotation_matrix(coords_previous)
+        # self.beam.probe.ue=np.array(self.beam.probe.ue)*0
+        # self.__update_rotation_matrix(coords_previous)
         self.beam.update_probe_ue(coords_rotations)
         self.__update_rotation_matrix(coords)
         self.beam.update_fint(self.fi,self.prop)
