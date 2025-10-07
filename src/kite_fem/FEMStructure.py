@@ -122,7 +122,7 @@ class FEM_structure:
         self.KC0 += self.__identity_matrix*self.I_stiffness
         self.Kuu = self.KC0[self.bu, :][:, self.bu]
 
-    def __update_internal_forces(self):
+    def update_internal_forces(self):
         self.fi = np.zeros(self.N, dtype=DOUBLE)
         self.fi_beams = np.zeros(self.N, dtype=DOUBLE)
 
@@ -169,11 +169,12 @@ class FEM_structure:
             "linear_solve": 0.0,
         }
         relax = relax_init
+        converged = False
         for iteration in range(max_iterations + 1):
             t0 = time.perf_counter()
 
 
-            self.__update_internal_forces()
+            self.update_internal_forces()
 
             
             timings["update_internal_forces"] += time.perf_counter() - t0
@@ -194,7 +195,6 @@ class FEM_structure:
                         f"Converged after {iteration} iterations. Residual: {residual_norm}"
                     )
                 converged = True
-                break
 
             if iteration == max_iterations:
                 if print_info:
@@ -202,7 +202,6 @@ class FEM_structure:
                         f"Did not converge after {max_iterations} iterations. Residual: {residual_norm}"
                     )
                 converged = False
-                break
 
             if iteration > 10 and self.residual_norm_history[-1] >= min(
                 self.residual_norm_history[-10:-1]
@@ -228,7 +227,10 @@ class FEM_structure:
             self.coords_rotations_previous = self.coords_rotations_current
             self.coords_rotations_current = self.coords_rotations_init + displacement
             self.coords_current = self.coords_rotations_current[self.__xyz]
-
+            
+            if converged == True:
+                break
+            
         # self.coords_rotations_current += self.displacement_reinit
         # self.coords_current = self.coords_rotations_current[self.__xyz]
         if print_info:
@@ -326,7 +328,7 @@ class FEM_structure:
             )
 
         if plot_forces_displacements:
-            self.__update_internal_forces()
+            self.update_internal_forces()
             self.__update_stiffness_matrix()
             residual = self.fe - self.fi
             displacement = lsqr(self.KC0, residual)[0]
