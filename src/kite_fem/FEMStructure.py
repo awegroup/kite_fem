@@ -154,7 +154,7 @@ class FEM_structure:
         relax_init=0.5,
         relax_update=0.95,
         k_update=1,
-        I_stiffness=25
+        I_stiffness=25,
         print_info = True
     ):
         if fe is not None:
