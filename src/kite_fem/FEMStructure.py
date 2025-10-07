@@ -155,6 +155,7 @@ class FEM_structure:
         relax_update=0.95,
         k_update=1,
         I_stiffness=25
+        print_info = True
     ):
         if fe is not None:
             self.fe = fe
@@ -189,16 +190,18 @@ class FEM_structure:
             self.iteration_history.append(iteration)
 
             if residual_norm < tolerance:
-                print(
-                    f"Converged after {iteration} iterations. Residual: {residual_norm}"
-                )
+                if print_info:
+                    print(
+                        f"Converged after {iteration} iterations. Residual: {residual_norm}"
+                    )
                 converged = True
                 break
 
             if iteration == max_iterations:
-                print(
-                    f"Did not converge after {max_iterations} iterations. Residual: {residual_norm}"
-                )
+                if print_info:
+                    print(
+                        f"Did not converge after {max_iterations} iterations. Residual: {residual_norm}"
+                    )
                 converged = False
                 break
 
@@ -229,14 +232,14 @@ class FEM_structure:
 
         # self.coords_rotations_current += self.displacement_reinit
         # self.coords_current = self.coords_rotations_current[self.__xyz]
-            
-        end_time = time.perf_counter()
-        total = end_time - start_time
-        print(f"Solver time: {total:.4f} s")
-        iters = max(1, len(self.iteration_history))
-        print("Timing summary (total / per-iter) [s]:")
-        for k, v in timings.items():
-            print(f"  {k:22s}: {v:.4f} / {v/iters:.6f}")
+        if print_info:
+            end_time = time.perf_counter()
+            total = end_time - start_time
+            print(f"Solver time: {total:.4f} s")
+            iters = max(1, len(self.iteration_history))
+            print("Timing summary (total / per-iter) [s]:")
+            for k, v in timings.items():
+                print(f"  {k:22s}: {v:.4f} / {v/iters:.6f}")
 
 
         return converged
