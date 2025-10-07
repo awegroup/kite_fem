@@ -39,7 +39,7 @@ class FEM_structure:
         self.init_KC0 = 0
         self.spring_elements = []
         self.beam_elements = []
-        self.__bu = np.ones(self.N, dtype=bool)
+        self.bu = np.ones(self.N, dtype=bool)
 
         self.__setup_initial_conditions(initial_conditions)
         if spring_matrix is not None:
@@ -48,7 +48,7 @@ class FEM_structure:
             self.__setup_pulley_elements(pulley_matrix)
         if beam_matrix is not None:
             self.__setup_beam_elements(beam_matrix)
-        self.__bu = np.where(self.__fixed == True, False, self.__bu)
+        self.bu = np.where(self.__fixed == True, False, self.bu)
 
     
     def modify_get_spring_rest_length(self, spring_ids = [], new_l0s = []):
@@ -80,7 +80,7 @@ class FEM_structure:
             self.spring_elements.append(spring_element)
             self.init_KC0 += self.__springdata.KC0_SPARSE_SIZE
             for id in [n1, n2]:
-                self.__bu[DOF * id+3 : DOF * id + 6] = False
+                self.bu[DOF * id+3 : DOF * id + 6] = False
 
     def __setup_pulley_elements(self, connectivity_matrix):
         for n1, n2, n3, k, c, l0 in connectivity_matrix:
@@ -95,7 +95,7 @@ class FEM_structure:
             self.spring_elements.append(spring_element)
             self.init_KC0 += self.__springdata.KC0_SPARSE_SIZE
             for id in [n1, n2, n3]:
-                self.__bu[DOF * id+3 : DOF * id + 6] = False
+                self.bu[DOF * id+3 : DOF * id + 6] = False
                 
     def __setup_beam_elements(self, connectivity_matrix):
         for n1, n2, E, A, I in connectivity_matrix:
@@ -105,7 +105,7 @@ class FEM_structure:
             self.beam_elements.append(beam_element)
             self.init_KC0 += self.__beamdata.KC0_SPARSE_SIZE
             for id in [n1, n2]:
-                self.__bu[DOF * id+3 : DOF * id + 6] = True
+                self.bu[DOF * id+3 : DOF * id + 6] = True
         
     def __update_stiffness_matrix(self):
         self.__KC0v *= 0
@@ -120,7 +120,7 @@ class FEM_structure:
                 
         self.KC0 = coo_matrix((self.__KC0v, (self.__KC0r, self.__KC0c)), shape=(self.N, self.N)).tocsc()
         self.KC0 += self.__identity_matrix*self.I_stiffness
-        self.Kuu = self.KC0[self.__bu, :][:, self.__bu]
+        self.Kuu = self.KC0[self.bu, :][:, self.bu]
 
     def __update_internal_forces(self):
         self.fi = np.zeros(self.N, dtype=DOUBLE)
@@ -133,8 +133,8 @@ class FEM_structure:
                 fi_element = spring_element.spring_internal_forces(self.coords_current, l_other_pulley)
             else:
                 fi_element = spring_element.spring_internal_forces(self.coords_current)
-            bu1 = self.__bu[spring_element.spring.c1 : spring_element.spring.c1 + DOF]
-            bu2 = self.__bu[spring_element.spring.c2 : spring_element.spring.c2 + DOF]
+            bu1 = self.bu[spring_element.spring.c1 : spring_element.spring.c1 + DOF]
+            bu2 = self.bu[spring_element.spring.c2 : spring_element.spring.c2 + DOF]
             self.fi[spring_element.spring.n1 * DOF : (spring_element.spring.n1 + 1) * DOF] -= (fi_element * bu1)
             self.fi[spring_element.spring.n2 * DOF : (spring_element.spring.n2 + 1) * DOF] += (fi_element * bu2)
 
@@ -185,7 +185,7 @@ class FEM_structure:
                 timings["update_stiffness"] += time.perf_counter() - t0
                 
             residual = self.fe - self.fi
-            residual_norm = np.linalg.norm(residual[self.__bu])
+            residual_norm = np.linalg.norm(residual[self.bu])
             self.residual_norm_history.append(residual_norm)
             self.iteration_history.append(iteration)
 
@@ -217,12 +217,12 @@ class FEM_structure:
             t0 = time.perf_counter()
 
             displacement_delta = lsqr(
-                self.Kuu, residual[self.__bu], atol=1e-7, btol=1e-7
+                self.Kuu, residual[self.bu], atol=1e-7, btol=1e-7
             )[0]
 
             timings["linear_solve"] += time.perf_counter() - t0
 
-            displacement[self.__bu] += np.clip(
+            displacement[self.bu] += np.clip(
                 displacement_delta * relax, -step_limit, step_limit
             )
                 
@@ -270,7 +270,7 @@ class FEM_structure:
             node_types = {True: ("Free Node", color), False: ("Fixed Node", "black")}
             label_set = {"Free Node": False, "Fixed Node": False}
             for n in range(self.num_nodes):
-                label, c = node_types[self.__bu[n * DOF]]
+                label, c = node_types[self.bu[n * DOF]]
                 ax.scatter(
                     self.coords_current[n * DOF // 2],
                     self.coords_current[n * DOF // 2 + 1],
@@ -341,7 +341,7 @@ class FEM_structure:
                 displacement_vector = (
                     coords
                     + displacement[DOF * node : DOF * node + 3]
-                    * self.__bu[DOF * node : DOF * node + 3]
+                    * self.bu[DOF * node : DOF * node + 3]
                 )
                 ax.plot(
                     [coords[0], residual_vector[0]],
