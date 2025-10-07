@@ -133,10 +133,9 @@ class FEM_structure:
                 fi_element = spring_element.spring_internal_forces(self.coords_current, l_other_pulley)
             else:
                 fi_element = spring_element.spring_internal_forces(self.coords_current)
-            bu1 = self.bu[spring_element.spring.c1 : spring_element.spring.c1 + DOF]
-            bu2 = self.bu[spring_element.spring.c2 : spring_element.spring.c2 + DOF]
-            self.fi[spring_element.spring.n1 * DOF : (spring_element.spring.n1 + 1) * DOF] -= (fi_element * bu1)
-            self.fi[spring_element.spring.n2 * DOF : (spring_element.spring.n2 + 1) * DOF] += (fi_element * bu2)
+
+            self.fi[spring_element.spring.n1 * DOF : (spring_element.spring.n1 + 1) * DOF] -= fi_element
+            self.fi[spring_element.spring.n2 * DOF : (spring_element.spring.n2 + 1) * DOF] += fi_element
 
         dif = self.coords_rotations_current - self.coords_rotations_previous
         for beam_element in self.beam_elements:
