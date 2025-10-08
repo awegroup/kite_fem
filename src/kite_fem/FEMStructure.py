@@ -2,7 +2,7 @@ from kite_fem.SpringElement import SpringElement
 from kite_fem.BeamElement import BeamElement
 from pyfe3d import DOF, INT, DOUBLE, SpringData, BeamCData
 from scipy.sparse import coo_matrix, identity
-from scipy.sparse.linalg import lsqr, lsmr
+from scipy.sparse.linalg import lsqr, spsolve
 import numpy as np
 import matplotlib.pyplot as plt
 import time
@@ -116,7 +116,7 @@ class FEM_structure:
             self.__KC0r, self.__KC0c, self.__KC0v = beam_element.update_KC0(self.__KC0r, self.__KC0c, self.__KC0v, self.coords_current)
             
         if np.count_nonzero(np.isnan(self.__KC0v)) > 0:
-            print(f"NaN detected in stiffness matrix")
+            raise ValueError("NaN detected in stiffness matrix")
                 
         self.KC0 = coo_matrix((self.__KC0v, (self.__KC0r, self.__KC0c)), shape=(self.N, self.N)).tocsc()
         self.KC0 += self.__identity_matrix*self.I_stiffness
@@ -144,6 +144,7 @@ class FEM_structure:
         self.fi += self.fi_beams
         self.fi += self.fi_reinit
         
+    
     def solve(
         self,
         fe=None,
@@ -214,9 +215,10 @@ class FEM_structure:
 
             t0 = time.perf_counter()
 
-            displacement_delta = lsqr(
-                self.Kuu, residual[self.bu], atol=1e-7, btol=1e-7
-            )[0]
+            #TODO: add decisiom making between lsqr solver and spsolve
+            
+            # displacement_delta = lsqr(self.Kuu, residual[self.bu], atol=1e-7, btol=1e-7)[0]
+            displacement_delta = spsolve(self.Kuu, residual[self.bu])
 
             timings["linear_solve"] += time.perf_counter() - t0
 
