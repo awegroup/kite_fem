@@ -40,7 +40,7 @@ class FEM_structure:
         self.spring_elements = []
         self.beam_elements = []
         self.bu = np.ones(self.N, dtype=bool)
-
+        self.reinitiliased = False
         self.__setup_initial_conditions(initial_conditions)
         if spring_matrix is not None:
             self.__setup_spring_elements(spring_matrix)
@@ -59,8 +59,8 @@ class FEM_structure:
 
     def __setup_initial_conditions(self, initial_conditions):
         self.__fixed = np.zeros(self.N, dtype=bool)
-        self.coords_init = np.zeros((self.num_nodes, 3), dtype=float)
-        self.coords_rotations_init = np.zeros((self.num_nodes, 6), dtype=float)
+        self.coords_init = np.zeros((self.num_nodes, 3), dtype=np.float64)
+        self.coords_rotations_init = np.zeros((self.num_nodes, 6), dtype=np.float64)
         for id, (pos, vel, mass, fixed) in enumerate(initial_conditions):
             self.coords_init[id] = pos
             self.coords_rotations_init[id] = np.concatenate([pos, [0, 0, 0]])
@@ -137,9 +137,9 @@ class FEM_structure:
             self.fi[spring_element.spring.n1 * DOF : (spring_element.spring.n1 + 1) * DOF] -= fi_element
             self.fi[spring_element.spring.n2 * DOF : (spring_element.spring.n2 + 1) * DOF] += fi_element
 
-        dif = self.coords_rotations_current - self.coords_rotations_previous
+        displacement = self.coords_rotations_current - self.coords_rotations_init
         for beam_element in self.beam_elements:
-            self.fi_beams += beam_element.beam_internal_forces(dif,self.coords_current,self.coords_rotations_previous[self.__xyz])
+            self.fi_beams += beam_element.beam_internal_forces(displacement,self.coords_current,self.coords_rotations_previous[self.__xyz])
 
         self.fi += self.fi_beams
         self.fi += self.fi_reinit
@@ -160,6 +160,8 @@ class FEM_structure:
         if fe is not None:
             self.fe = fe
         displacement = np.zeros(self.N, dtype=DOUBLE)
+        if self.reinitiliased:
+            displacement = self.displacement_reinit
         self.iteration_history = []
         self.residual_norm_history = []
         start_time = time.perf_counter()
@@ -184,12 +186,15 @@ class FEM_structure:
                 t0 = time.perf_counter()
                 self.__update_stiffness_matrix()
                 timings["update_stiffness"] += time.perf_counter() - t0
-                
+            
+
             residual = self.fe - self.fi
             residual_norm = np.linalg.norm(residual[self.bu])
             self.residual_norm_history.append(residual_norm)
             self.iteration_history.append(iteration)
 
+            #chrisfield approach
+            
             if residual_norm < tolerance:
                 if print_info:
                     print(
@@ -218,7 +223,12 @@ class FEM_structure:
             #TODO: add decisiom making between lsqr solver and spsolve
             
             # displacement_delta = lsqr(self.Kuu, residual[self.bu], atol=1e-7, btol=1e-7)[0]
-            displacement_delta = spsolve(self.Kuu, residual[self.bu])
+            #from pypardiso impolve spsolve
+            try:
+                displacement_delta = spsolve(self.Kuu, residual[self.bu])
+            except Exception as e:
+                print(f"spsolve failed with error: {e}. Falling back to lsqr solver.")
+                displacement_delta = lsqr(self.Kuu, residual[self.bu], atol=1e-7, btol=1e-7)[0]
 
             timings["linear_solve"] += time.perf_counter() - t0
 
@@ -230,7 +240,7 @@ class FEM_structure:
             self.coords_rotations_current = self.coords_rotations_init + displacement
             self.coords_current = self.coords_rotations_current[self.__xyz]
             
-            if converged == True:
+            if converged:
                 break
             
         # self.coords_rotations_current += self.displacement_reinit
@@ -255,10 +265,9 @@ class FEM_structure:
         self.coords_rotations_previous = self.coords_rotations_init
 
     def reinitialise(self):
-        self.displacement_reinit =  self.coords_rotations_current
-        self.fi_reinit = self.fi
-        self.reset()
-
+        self.displacement_reinit =  self.coords_rotations_current - self.coords_rotations_init
+        self.reinitiliased = True
+        
     def plot_3D(
         self, color="blue", ax=None, fig=None, plot_forces_displacements=False, fe=None, show_plot=True, show_legend=True,plot_nodes=True
     ):
