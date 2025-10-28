@@ -122,7 +122,10 @@ class FEM_structure:
         self.KC0 = coo_matrix((self.__KC0v, (self.__KC0r, self.__KC0c)), shape=(self.N, self.N)).tocsc()
         self.KC0 += self.__identity_matrix*self.I_stiffness
         self.Kuu = self.KC0[self.bu, :][:, self.bu]
-
+    
+    def update_beam_parameters(self,alpha,beta,gamma):
+        for beam_element in self.beam_elements:
+            beam_element.updateparameter(alpha,beta,gamma)
         
     def update_internal_forces(self):
         self.fi = np.zeros(self.N, dtype=DOUBLE)
@@ -203,10 +206,9 @@ class FEM_structure:
                 converged = True
 
             if iteration == max_iterations:
-                if print_info:
-                    print(
-                        f"Did not converge after {max_iterations} iterations. Residual: {residual_norm}"
-                    )
+                print(
+                    f"Did not converge after {max_iterations} iterations. Residual: {residual_norm}"
+                )
                 converged = False
 
             if iteration > 10 and self.residual_norm_history[-1] >= min(
