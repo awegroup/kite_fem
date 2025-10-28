@@ -44,14 +44,13 @@ class BeamElement:
         C6 = 215.93
         C7 = 14021.79
         C8 = -589.05
-        
-        factor = np.e
-        factor = np.e**(self.L-1)*2
+        # factor = np.e
+        factor = np.e**(1-self.L)
         
         denom = (C1 * self.r + C2) * self.p**2 + (C3 * self.r**3 + C4)
         numer = (C5 * self.r**5 + C6) * self.p + (C7 * self.r + C8)
-        F = denom * (1 - np.exp(-(numer / denom) * deflection)) *(1/self.L)**3*factor
-        EI = F*(self.L**3)/(3*deflection) 
+        F = denom * (1 - np.exp(-(numer / denom) * (deflection))) *(1/self.L)**3
+        EI = F*(self.L**3)/(3*deflection)
         self.E = EI/self.I
         self.prop.E = self.E
         
@@ -64,7 +63,6 @@ class BeamElement:
         C17 = -17703
         C18 = 358.05
         C19 = 0.0918
-        factor = np.e
         
         T = ((C13*self.r+C14)*self.p+(C15*self.r+C16))*np.arctan(((C17*self.r**4)*np.log(self.p)+(C18*self.r**3+C19))*rotation)*(1/self.L)**(1)
         GJ = T*self.L/(rotation)
@@ -87,15 +85,17 @@ class BeamElement:
     def get_beam_deflection(self):
         tipdeflection = np.array(self.beam.probe.ue[7:9])
         basedeflection = np.array(self.beam.probe.ue[1:3])
-        deflection = np.linalg.norm(tipdeflection)
-        deflection = max(deflection,0.02)
+        deflection = np.linalg.norm(tipdeflection+basedeflection)
+        if deflection == 0:
+            deflection = 0.00000000000001
         return deflection
     
     def get_beam_rotation(self):
         tiprotation = np.array(self.beam.probe.ue[9])
         baserotation = np.array(self.beam.probe.ue[3])
-        rotation = np.linalg.norm(tiprotation)
-        rotation = max(rotation,0.02)
+        rotation = np.linalg.norm(tiprotation+baserotation)
+        if rotation == 0:
+            rotation = 0.000000000001
         return rotation
     
     # def update_inflatable_beam_properties(self, d, p,coords: np.ndarray):
@@ -138,8 +138,9 @@ class BeamElement:
         self.update_KC0v_only = 1
         return KC0r, KC0c, KC0v
     
-    def reset(self):
-        self.beam.probe.ue=np.array(self.beam.probe.ue)*0
+    def reset(self,coords,displacement):
+        self.update_rotation_matrix(coords)
+        self.beam.update_probe_ue(displacement)
         self.fi *=0
         self.update_inflatable_beam_properties()
 

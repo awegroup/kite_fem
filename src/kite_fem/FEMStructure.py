@@ -258,12 +258,13 @@ class FEM_structure:
         return converged
 
     def reset(self):
-        for beam_element in self.beam_elements:
-            beam_element.reset()
+
         self.coords_current = self.coords_init
         self.coords_rotations_current = self.coords_rotations_init
         self.coords_rotations_previous = self.coords_rotations_init
-
+        self.displacement_reinit *= 0
+        for beam_element in self.beam_elements:
+            beam_element.reset(self.coords_current,self.coords_rotations_current-self.coords_rotations_init)
     def reinitialise(self):
         self.displacement_reinit =  self.coords_rotations_current - self.coords_rotations_init
         self.reinitiliased = True
