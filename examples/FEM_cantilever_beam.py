@@ -4,16 +4,22 @@ from kite_fem.FEMStructure import FEM_structure
 
 initital_conditions = []
 length = 10 #m
-elements = 2
+elements = 5
 
 for i in range(elements+1):
     initital_conditions.append([[i*length/elements, 0.0, 0.0], [0, 0, 0], 1, True if i==0 else False])
 
 
 load_param = 1.5#
-E = 210e5 # Pa
-I = 1.6e-5  # m^4
-A = 1 # m^2
+E = 210e9 # Pa
+r = 5 #cm
+# assume r was given in cm; convert to meters and compute circular section properties
+r = r / 100.0  # cm -> m
+A = np.pi * r**2
+I = np.pi * r**4 / 4.0
+# print("radius (m):", r, "Area (m^2):", A, "I (m^4):", I)
+# I = 1.6e-5  # m^4
+# A = 50 # m^2
 print("E*I", E*I)
 L = length/elements #m
 
@@ -33,10 +39,10 @@ ax,fig = steel_beam.plot_3D(color= "blue",show_plot=False)
 steel_beam.reset()
 
 steel_beam.solve(        fe=fe,
-        max_iterations=2000,
+        max_iterations=1000,
         tolerance=0.1,
-        step_limit=2,
-        relax_init=1,
+        step_limit=1,
+        relax_init=0.5,
         relax_update=0.95,
         k_update=1,
         I_stiffness=25
@@ -47,16 +53,16 @@ ax,fig = steel_beam.plot_3D(ax=ax, fig=fig, color="red",plot_forces_displacement
 # print(steel_beam.residual_norm_history[-1])
 steel_beam.reinitialise()
 # print(steel_beam.fi)
-steel_beam.reset()
+# steel_beam.reset()
 # print(steel_beam.residual_norm_history[0])
 
 # steel_beam.reset()
 
 steel_beam.solve(   fe=fe ,   
-        max_iterations=2000,
+        max_iterations=1000,
         tolerance=0.1,
-        step_limit=2,
-        relax_init=1,
+        step_limit=1,
+        relax_init=0.5,
         relax_update=0.95,
         k_update=1,
         I_stiffness=25
@@ -72,3 +78,5 @@ print("w/L", -steel_beam.coords_rotations_current[1::6][-1]/length)
 print("u/L", 1-steel_beam.coords_rotations_current[0::6][-1]/length)
 print("theta", -steel_beam.coords_rotations_current[-1])
 plt.show()
+
+print(steel_beam.coords_current[-1])

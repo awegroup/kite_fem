@@ -25,7 +25,7 @@ def F_inflatablebeam(p, r, v):
 chord = 2.63 #m
 span_total = 11.302
 span = span_total/8 #m
-nodes_per_beam = 7
+nodes_per_beam = 6
 nodes = nodes_per_beam**2+3
 elements_per_beam = nodes_per_beam - 1
 
@@ -82,21 +82,20 @@ for i in range(nodes_per_beam):
             else:
                 n1s_canopy_y.append(idx)
                 n2s_canopy_y.append(up_idx)
-        #connect to fixed node
-        # if i == 0 and not (j==0 or j == 0 or j==nodes_per_beam-1):
-        #     n1s_tether.append(nodes-1)
-        #     n2s_tether.append(idx)
+        #connect to bridle nodes
         if j==0 and (i==0 or i ==1):
             n1s_tether.append(nodes-2)
             n2s_tether.append(idx)
         if j==nodes_per_beam-1 and (i==0 or i ==1):
             n1s_tether.append(nodes-1)
             n2s_tether.append(idx)
-            
+        #connect to fixed node
+
         if (j == 0 or j==nodes_per_beam-1) and i==nodes_per_beam-1:
             n1s_tether.append(nodes-3)
             n2s_tether.append(idx)
 
+#bridle nodes to fixed node
 n1s_tether.append(nodes-2)
 n2s_tether.append(nodes-3)
 n1s_tether.append(nodes-1)
@@ -105,8 +104,8 @@ n2s_tether.append(nodes-3)
 spring_matrix = []
 beam_matrix = []
 #springs canopy
-l0_x = chord/elements_per_beam*1.05
-l0_y = span/elements_per_beam*1.05
+l0_x = chord/elements_per_beam*1.0
+l0_y = span/elements_per_beam*1.0
 k = 50000
 c = 0
 for n1,n2 in zip(n1s_canopy_x,n2s_canopy_x):
@@ -116,14 +115,14 @@ for n1,n2 in zip(n1s_canopy_y,n2s_canopy_y):
 
 
 #fictional springs constraining the canopy from collapse
-n1_fictional =[]
-n2_fictional = []
-for i in range(nodes_per_beam-1):
-    n1_fictional.append(nodes_per_beam-1-i)
-    n2_fictional.append(nodes_per_beam**2-1-i)
+# n1_fictional =[]
+# n2_fictional = []
+# for i in range(nodes_per_beam-1):
+#     n1_fictional.append(nodes_per_beam-1-i)
+#     n2_fictional.append(nodes_per_beam**2-1-i)
 
-for n1,n2 in zip(n1_fictional,n2_fictional):
-    spring_matrix.append([n1,n2,50000,c,span,"default"])
+# for n1,n2 in zip(n1_fictional,n2_fictional):
+#     spring_matrix.append([n1,n2,50000,c,span,"default"])
 
 #springs to fixed node
 l0 = 0
@@ -140,17 +139,18 @@ p = 0.2
 v= 0.03
 L_y = span/elements_per_beam 
 L_x = chord/elements_per_beam
-EI_x = F_inflatablebeam(p,r,v)*L_x/(3*v)
-EI_y = F_inflatablebeam(p,r,v)*L_y/(3*v)
+EI_x = F_inflatablebeam(p,r,v)*chord/(3*v)
+EI_y = F_inflatablebeam(p,r,v)*span/(3*v)
 A = np.pi*(r**2 - (r-t)**2)  # 
 I = (np.pi/4)*(r**4 - (r-t)**4)  # m^4
 E_x = EI_x/I
 E_y = EI_y/I
 
+
 for n1,n2 in zip(n1s_beam_x,n2s_beam_x):
-    beam_matrix.append([n1, n2, E_x, A, I])
+    beam_matrix.append([n1, n2, p, d])
 for n1,n2 in zip(n1s_beam_y,n2s_beam_y):
-    beam_matrix.append([n1, n2, E_y, A, I])
+    beam_matrix.append([n1, n2, p, d])
 
 canopy = FEM_structure(initial_conditions=initial_conditions,spring_matrix=spring_matrix,beam_matrix=beam_matrix)
 
@@ -163,39 +163,43 @@ for i in range(len(n1s_tether)):
 fe = np.zeros(nodes*6)    
 
 def create_uniform_load(nodes_per_beam, chord, span, total_force):
-    """
-    Creates a force vector for a rectangular grid of nodes.
-    The force is distributed uniformly along the y-span,
-    and along the x-span the peak is at the quarter chord (x = 0.25 * chord)
-    using a Gaussian distribution centered at quarter chord.
-    The force is applied in the negative z-direction.
-    """
     nodes = nodes_per_beam ** 2 + 3
     fe = np.zeros(nodes * 6)
     sigma = 0.3 * chord  # width of the Gaussian peak
 
-    # Only apply to grid nodes (not the fixed node at the end)
     for j in range(nodes_per_beam):
         for i in range(nodes_per_beam):
             idx = j * nodes_per_beam + i
             x = i * chord / (nodes_per_beam - 1)
             y = j * span / (nodes_per_beam - 1)
             # Gaussian weight along x, uniform along y
-            weight_x = np.exp(-0.5 * ((x - 0.35 * chord) / sigma) ** 2)+0.3  # add small constant to avoid zero at edges
-            fe[idx * 6 + 2] = weight_x  # accumulate weights
+            weight_x = np.exp(-0.5 * ((x - 0.35 * chord) / sigma) ** 2) + 0.3
 
-    # Normalize so total force sums to total_force
+            # Angle from vertical: 0 at center, 30 deg at edges
+            y_centered = (y - span / 2) / (span / 2)  # -1 to 1
+            angle = y_centered * (np.pi / 4)  # -30deg to +30deg
+
+            # Decompose force into z and y
+            fe_z = weight_x * np.cos(angle)
+            fe_y = weight_x * np.sin(angle)
+
+            fe[idx * 6 + 2] = fe_z
+            fe[idx * 6 + 1] = fe_y
+
+    # Normalize so total force sums to total_force (z-component)
     total_weight = np.sum(fe[2::6])
     if total_weight > 0:
-        fe[2::6] *= -total_force / total_weight  # negative z-direction
+        scale = -total_force / total_weight  # negative z-direction
+        fe[2::6] *= scale
+        fe[1::6] *= scale
 
     return -fe
 
 # Example usage:
-total_force = 1000  # N, adjust as needed
+total_force = 300  # N, adjust as needed
 fe = create_uniform_load(nodes_per_beam, chord, span, total_force)
 # ax,fig = canopy.plot_3D(show_plot=False)
-canopy.plot_3D(fe=fe, plot_forces_displacements=True,show_plot=False)
-canopy.solve(fe=fe,max_iterations = 1000 ,I_stiffness=500,tolerance=50,relax_init=0.8)
-# canopy.plot_convergence()
-canopy.plot_3D(plot_nodes=False)
+canopy.plot_3D(fe=fe, plot_forces_displacements=True,show_plot=False,plot_nodes=False)
+canopy.solve(fe=fe,max_iterations = 1000 ,I_stiffness=15,tolerance=5,relax_init=0.5,step_limit = 0.1)
+canopy.plot_convergence()
+canopy.plot_3D(plot_nodes=False,plot_forces_displacements=True)

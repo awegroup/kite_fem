@@ -47,7 +47,7 @@ class SpringElement:
         k_fi = self.k
         if self.springtype == "noncompressive" or self.springtype == "pulley":
             if l+l_other_pulley < (self.l0):
-                self.spring.kxe = 0.01*self.k
+                self.spring.kxe = 0.00*self.k
                 k_fi = 0.0
             else:
                 self.spring.kxe = self.k

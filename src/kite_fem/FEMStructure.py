@@ -98,10 +98,11 @@ class FEM_structure:
                 self.bu[DOF * id+3 : DOF * id + 6] = False
                 
     def __setup_beam_elements(self, connectivity_matrix):
-        for n1, n2, E, A, I in connectivity_matrix:
+        # for n1, n2, E, A, I in connectivity_matrix:
+        for n1, n2, d, p in connectivity_matrix:
             beam_element = BeamElement(n1, n2, self.init_KC0,self.N)
             L = beam_element.unit_vector(self.coords_init)[1]
-            beam_element.set_beam_properties(E, A, I,L)
+            beam_element.set_inflatable_beam_properties(d,p,L)
             self.beam_elements.append(beam_element)
             self.init_KC0 += self.__beamdata.KC0_SPARSE_SIZE
             for id in [n1, n2]:
@@ -122,6 +123,7 @@ class FEM_structure:
         self.KC0 += self.__identity_matrix*self.I_stiffness
         self.Kuu = self.KC0[self.bu, :][:, self.bu]
 
+        
     def update_internal_forces(self):
         self.fi = np.zeros(self.N, dtype=DOUBLE)
         self.fi_beams = np.zeros(self.N, dtype=DOUBLE)
@@ -138,11 +140,11 @@ class FEM_structure:
             self.fi[spring_element.spring.n2 * DOF : (spring_element.spring.n2 + 1) * DOF] += fi_element
 
         displacement = self.coords_rotations_current - self.coords_rotations_init
+        
         for beam_element in self.beam_elements:
-            self.fi_beams += beam_element.beam_internal_forces(displacement,self.coords_current,self.coords_rotations_previous[self.__xyz])
+            self.fi_beams += beam_element.beam_internal_forces(displacement,self.coords_current)
 
         self.fi += self.fi_beams
-        self.fi += self.fi_reinit
         
     
     def solve(
@@ -176,10 +178,8 @@ class FEM_structure:
         for iteration in range(max_iterations + 1):
             t0 = time.perf_counter()
 
-
             self.update_internal_forces()
 
-            
             timings["update_internal_forces"] += time.perf_counter() - t0
             
             if iteration % k_update == 0:
