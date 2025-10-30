@@ -18,15 +18,33 @@ class BeamElement:
         # self.alpha = -0.23
         # self.beta = 1.21
         # self.gamma = 0.875
-        self.alpha = -0.3
-        self.beta = 1.35
-        self.gamma = 0.85
+        # self.alpha = -0.3
+        # self.beta = 1.35
+        # self.gamma = 0.85
+        # self.alpha = -0.2
+        # self.beta = 1.15
+        # self.gamma = 0.95
+
+        # gamma twice
+        # self.alpha = -0.2
+        # self.beta = 1.35
+        # self.gamma = 0.85
+        # gamma twice
+        self.alpha = -0.35
+        self.beta = 1.41
+        self.gamma = 0.95
+
 
     def set_inflatable_beam_properties(self,d,p,L):
         self.r = 0.5*d
-        self.A = np.pi * self.r**2
-        self.I = np.pi * self.r**4 / 4.0
-        self.J = self.I*2
+        self.t = 0.01*d
+        self.A = 2*np.pi*self.r*self.t
+        self.I = (np.pi/4)*(self.r**4 - (self.r - self.t)**4)
+        
+        # self.A = np.pi * self.r**2
+        # self.I = np.pi * self.r**4 / 4.0
+        
+        self.J = self.I*2   
         self.prop.A = self.A
         self.prop.Ay = 0
         self.prop.Az = 0
@@ -64,16 +82,30 @@ class BeamElement:
         alpha = self.alpha
         beta = self.beta
         gamma = self.gamma
-
+        # gamma = 0.9
         # alpha = -0.25
         # beta =1.3
-        # gamma  =0.85
+        gamma  = 1
 
+        power = 1
+        power2 = 1
+        
         denom = (C1 * self.r + C2) * self.p**2 + (C3 * self.r**3 + C4)
         numer = (C5 * self.r**5 + C6) * self.p + (C7 * self.r + C8)
-        F = denom * (1 - np.exp(-(numer / denom) * gamma*(deflection/(self.L**beta)))) *(1/self.L)**(2+alpha) 
+        # F = denom * (1 - np.exp(-(numer / denom) * gamma*(deflection/(self.L**beta)))) *(1/self.L)**(2+alpha) 
+        
+        func = (1-np.exp(-(numer/denom)))*deflection / ((1-np.exp(-(numer/denom*deflection))*self.L**3))
 
-        EI = F*(self.L**3)/(3*deflection)
+
+        # F = denom * (1 - np.exp(-(numer / denom) * (deflection/self.L**beta)*gamma))*(gamma/self.L**(2+alpha))
+
+        F = denom * (1 - np.exp(-(numer / denom) * (deflection)))
+        EI = F*1/(3*deflection)
+
+        if np.isnan(EI) or EI <=50:
+            EI = 50
+
+
         self.E = EI/self.I
         self.prop.E = self.E
         
@@ -86,10 +118,19 @@ class BeamElement:
         C17 = -17703
         C18 = 358.05
         C19 = 0.0918
+        c1 = ((C13*self.r+C14)*self.p+(C15*self.r+C16))
+        c2 = ((C17*self.r**4)*np.log(self.p)+(C18*self.r**3+C19))
+
+        #extrapolated rotation to 1m
+        # rotation = (rotation/self.L)
         
-        T = ((C13*self.r+C14)*self.p+(C15*self.r+C16))*np.arctan(((C17*self.r**4)*np.log(self.p)+(C18*self.r**3+C19))*rotation/self.L)
+
+        T = c1*np.arctan(c2*rotation)
         
-        GJ = T*self.L/(rotation)
+        GJ = T*1/(rotation)
+        if np.isnan(GJ) or GJ <=50:
+            GJ = 50
+
         self.G = GJ/self.J
         self.prop.G = self.G
         
@@ -107,28 +148,29 @@ class BeamElement:
         self.beam.length = L
     
     def get_beam_deflection(self):
-        tipdeflection = np.array(self.beam.probe.ue[6:9])
-        basedeflection = np.array(self.beam.probe.ue[0:3])
-        deflection = np.linalg.norm(tipdeflection-basedeflection)
-        if deflection == 0:
-            deflection = 0.00000000000001
+        tipdeflection = np.array(self.beam.probe.ue[7:9])
+        basedeflection = np.array(self.beam.probe.ue[1:3])
+        a = 0.5
+        n = 1 + (1 - np.exp(-((self.L)/a)**2))
+        tipdeflection_scaled = tipdeflection/self.L**n
+        basedeflection_scaled = basedeflection/self.L**n
+        deflection = np.linalg.norm(tipdeflection_scaled - basedeflection_scaled)
         return deflection
     
     def get_beam_rotation(self):
         tiprotation = np.array(self.beam.probe.ue[9])
         baserotation = np.array(self.beam.probe.ue[3])
-        rotation = np.linalg.norm(tiprotation-baserotation)
-        if rotation == 0:
-            rotation = 0.000000000001
+        tiprotation_scaled = tiprotation/self.L
+        baserotation_scaled = baserotation/self.L
+        rotation = tiprotation_scaled-baserotation_scaled
         return rotation
     
-    def get_bending_rotation(self):
-        tiprotation = np.array(self.beam.probe.ue[9:12])
-        baserotation = np.array(self.beam.probe.ue[3:6])
-        rotation = np.linalg.norm(tiprotation-baserotation)
-        if rotation == 0:
-            rotation = 0.00000000000001
-        return rotation
+    # def get_bending_rotation(self):
+    #     tiprotation = np.array(self.beam.probe.ue[9:12])
+    #     baserotation = np.array(self.beam.probe.ue[3:6])
+    #     rotation = np.linalg.norm(tiprotation-baserotation)
+    #     # rotation_norm = rotation/self.L
+    #     return rotation
     
     # def update_inflatable_beam_properties(self, d, p,coords: np.ndarray):
     #     # Coefficients
