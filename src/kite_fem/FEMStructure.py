@@ -123,10 +123,6 @@ class FEM_structure:
         self.KC0 += self.__identity_matrix*self.I_stiffness
         self.Kuu = self.KC0[self.bu, :][:, self.bu]
     
-    def update_beam_parameters(self,alpha,beta,gamma):
-        for beam_element in self.beam_elements:
-            beam_element.updateparameter(alpha,beta,gamma)
-        
     def update_internal_forces(self):
         self.fi = np.zeros(self.N, dtype=DOUBLE)
         self.fi_beams = np.zeros(self.N, dtype=DOUBLE)
