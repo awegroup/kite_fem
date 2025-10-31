@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 from kite_fem.FEMStructure import FEM_structure
+from kite_fem.Plotting import plot_structure, plot_convergence
 
 # Define initial conditions and connectivity matrix
 initial_conditions = [
@@ -114,7 +115,7 @@ spring_matrix = [
 
 # Create FEM structure and solve
 SaddleForm = FEM_structure(initial_conditions, spring_matrix)
-ax1, fig1 = SaddleForm.plot_3D(color="red", plot_forces_displacements=True)
+ax1, fig1 = plot_structure(SaddleForm, plot_displacements=True)
 SaddleForm.solve(
     fe=None,
     max_iterations=1000,
@@ -124,6 +125,11 @@ SaddleForm.solve(
     relax_update=0.95,
     k_update=10,
 )
-ax2, fig2 = SaddleForm.plot_3D(color="blue", plot_forces_displacements=False)
-ax3, fig3 = SaddleForm.plot_convergence()
-
+ax2, fig2 = plot_structure(SaddleForm)
+ax3, fig3 = plot_convergence(SaddleForm)
+ax1.set_title("Initial Configuration")
+ax2.set_title("Deformed Configuration")
+ax3.set_title("Convergence History")
+ax1.legend()
+ax2.legend()
+plt.show()

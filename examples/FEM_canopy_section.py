@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from kite_fem.FEMStructure import FEM_structure
+from kite_fem.Plotting import plot_structure, plot_convergence
 
 def F_inflatablebeam(p, r, v):
     # Coefficients
@@ -196,10 +197,17 @@ def create_uniform_load(nodes_per_beam, chord, span, total_force):
     return -fe
 
 # Example usage:
-total_force = 300  # N, adjust as needed
+total_force = 200  # N, adjust as needed
 fe = create_uniform_load(nodes_per_beam, chord, span, total_force)
+
 # ax,fig = canopy.plot_3D(show_plot=False)
-canopy.plot_3D(fe=fe, plot_forces_displacements=True,show_plot=False,plot_nodes=False)
-canopy.solve(fe=fe,max_iterations = 1000 ,I_stiffness=15,tolerance=5,relax_init=0.5,step_limit = 0.1)
-canopy.plot_convergence()
-canopy.plot_3D(plot_nodes=False,plot_forces_displacements=True)
+ax1,fig1 = plot_structure(canopy,fe=fe, plot_nodes=False)
+canopy.solve(fe=fe,max_iterations = 1000 ,I_stiffness=15,tolerance=5,relax_init=0.25,step_limit = 0.1)
+ax2,fig2 = plot_structure(canopy,fe=fe, plot_nodes=False)
+ax3,fig3 = plot_convergence(canopy)
+ax1.legend()
+ax2.legend()
+ax1.set_title("Initial Configuration")
+ax2.set_title("Deformed Configuration")
+ax3.set_title("Convergence History")
+plt.show()

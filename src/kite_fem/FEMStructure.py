@@ -6,6 +6,7 @@ from scipy.sparse.linalg import lsqr, spsolve
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+import warnings
 
 
 class FEM_structure:
@@ -42,7 +43,7 @@ class FEM_structure:
         if beam_matrix is not None:
             self.__setup_beam_elements(beam_matrix)
         #Overwriting boundary conditions from elements with fixed nodes from initial_conditions
-        self.bc = np.where(self.__fixed == True, False, self.bc)
+        self.bc = np.where(self.fixed == True, False, self.bc)
 
         #mask to extract coords array from coords_rotations array
         self.__coordmask = np.zeros(self.N, dtype=bool)
@@ -52,10 +53,11 @@ class FEM_structure:
         self.fi = np.zeros(self.N, dtype=DOUBLE)
         #Identity matrix for stiffness improvement
         self.__identity_matrix = identity(self.N, format="csc")
+        self.__I_stiffness = 0
 
     def __setup_initial_conditions(self, initial_conditions):
         #sets up initial positions, velocities, masses and fixed nodes. Velocities and masses are not used, but were included to match PSS inputs (https://github.com/awegroup/Particle_System_Simulator)
-        self.__fixed = np.zeros(self.N, dtype=bool)
+        self.fixed = np.zeros(self.N, dtype=bool)
         self.coords_init = np.zeros((self.num_nodes, 3), dtype=np.float64)
         self.coords_rotations_init = np.zeros((self.num_nodes, 6), dtype=np.float64)
         #assigning all initial conditions, and setting fixed DOF's
@@ -63,7 +65,7 @@ class FEM_structure:
             self.coords_init[id] = pos
             self.coords_rotations_init[id] = np.concatenate([pos, [0, 0, 0]])
             if fixed == True:
-                self.__fixed[DOF * id : DOF * id + 6] = True
+                self.fixed[DOF * id : DOF * id + 6] = True
         #Initalising coords (translational DOF's) and coords_rotation (translational+rotational DOF's) flat arrays
         self.coords_init = self.coords_init.flatten()
         self.coords_current = self.coords_init.flatten()
@@ -119,7 +121,7 @@ class FEM_structure:
             for id in [n1, n2]:
                 self.bc[DOF * id+3 : DOF * id + 6] = True
         
-    def __update_stiffness_matrix(self):
+    def update_stiffness_matrix(self):
         self.__KC0v *= 0
         #Update stiffness matrix due to spring elements
         for spring_element in self.spring_elements:
@@ -205,7 +207,7 @@ class FEM_structure:
             #update stiffness matrix, initially and every k_update iterations
             if iteration % k_update == 0:
                 t0 = time.perf_counter()
-                self.__update_stiffness_matrix()
+                self.update_stiffness_matrix()
                 timings["update_stiffness"] += time.perf_counter() - t0
             
             #determine residual, add norm to history
@@ -215,6 +217,7 @@ class FEM_structure:
             self.iteration_history.append(iteration)
 
             #check for convergence
+            #TODO: look into chrisfield convergence criteria            
             if residual_norm < tolerance:
                 if print_info:
                     print(
@@ -237,18 +240,25 @@ class FEM_structure:
             ):
                 relax *= relax_update
 
-
             #TODO: add decisiom making between lsqr solver and spsolve
             #TODO: test pypardiso spsolve
 
-            #solve the linear system Ku=r for u (displacement delta)
+            #solve the linear system Ku=r for u (displacement delta), use spsolve with fallback on lsqr
             t0 = time.perf_counter()
-            try:
-                displacement_delta = spsolve(self.Kbc, residual[self.bc])
-            except Exception as e:
-                #fall back on lsqr solver if spsolve fails, maybe unnecessary
-                print(f"spsolve failed with error: {e}. Falling back to lsqr solver.")
-                displacement_delta = lsqr(self.Kbc, residual[self.bc], atol=1e-7, btol=1e-7)[0]
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                try:
+                    displacement_delta = spsolve(self.Kbc, residual[self.bc])
+                    #fall back on lsqr solver if spsolve generates warnings
+                    if w:  
+                        if print_info:
+                            print(f"spsolve generated warnings: {[warning.message for warning in w]}. Falling back to lsqr solver.")
+                        displacement_delta = lsqr(self.Kbc, residual[self.bc], atol=1e-7, btol=1e-7)[0]
+                except Exception as e:
+                    #fall back on lsqr solver if spsolve fails
+                    if print_info:
+                        print(f"spsolve failed with error: {e}. Falling back to lsqr solver.")
+                    displacement_delta = lsqr(self.Kbc, residual[self.bc], atol=1e-7, btol=1e-7)[0]
             timings["linear_solve"] += time.perf_counter() - t0
 
             #relax displacement delta and apply step limits, then update displacement array
@@ -287,151 +297,5 @@ class FEM_structure:
             self.spring_elements[spring_id].l0 = new_l0
         rest_lengths = np.array([spring.l0 for spring in self.spring_elements])
         return rest_lengths   
-    
 
 
-
-
-
-
-
-
-    def plot_3D(
-        self, color="blue", ax=None, fig=None, plot_forces_displacements=False, fe=None, show_plot=True, show_legend=True,plot_nodes=True
-    ):
-        if fig is None:
-            fig = plt.figure()
-        if ax is None:
-            ax = fig.add_subplot(111, projection="3d")
-        if fe is not None:
-            self.fe = fe
-            
-        if plot_nodes:
-            node_types = {True: ("Free Node", color), False: ("Fixed Node", "black")}
-            label_set = {"Free Node": False, "Fixed Node": False}
-            for n in range(self.num_nodes):
-                label, c = node_types[self.bc[n * DOF]]
-                ax.scatter(
-                    self.coords_current[n * DOF // 2],
-                    self.coords_current[n * DOF // 2 + 1],
-                    self.coords_current[n * DOF // 2 + 2],
-                    color=c,
-                    label=label if not label_set[label] else None,
-                )
-                label_set[label] = True
-
-        for i, spring_element in enumerate(self.spring_elements):
-            c = color
-            if spring_element.springtype == "pulley":
-                c = "orange"
-            # if spring_element.springtype == "noncompressive":
-            #     c = 'green'
-            n1 = spring_element.spring.n1
-            n2 = spring_element.spring.n2
-            ax.plot(
-                [
-                    self.coords_current[n1 * DOF // 2],
-                    self.coords_current[n2 * DOF // 2],
-                ],
-                [
-                    self.coords_current[n1 * DOF // 2 + 1],
-                    self.coords_current[n2 * DOF // 2 + 1],
-                ],
-                [
-                    self.coords_current[n1 * DOF // 2 + 2],
-                    self.coords_current[n2 * DOF // 2 + 2],
-                ],
-                color=c,
-                label="Spring Element" if i == 0 else None,
-            )
-
-        for i, beam_element in enumerate(self.beam_elements):
-            c = "green"
-            n1 = beam_element.beam.n1
-            n2 = beam_element.beam.n2
-            ax.plot(
-                [
-                    self.coords_current[n1 * DOF // 2],
-                    self.coords_current[n2 * DOF // 2],
-                ],
-                [
-                    self.coords_current[n1 * DOF // 2 + 1],
-                    self.coords_current[n2 * DOF // 2 + 1],
-                ],
-                [
-                    self.coords_current[n1 * DOF // 2 + 2],
-                    self.coords_current[n2 * DOF // 2 + 2],
-                ],
-                color=c,
-                label="Beam Element" if i == 0 else None,
-            )
-
-        if plot_forces_displacements:
-            self.update_internal_forces()
-            self.__update_stiffness_matrix()
-            residual = self.fe - self.fi
-            displacement = lsqr(self.KC0, residual)[0]
-            scale = 250
-            for node in range(self.num_nodes):
-                coords = self.coords_current[node * DOF // 2 : node * DOF // 2 + 3]
-                residual_vector = coords + residual[DOF * node : DOF * node + 3] / scale
-                external_force_vector = (
-                    coords + self.fe[DOF * node : DOF * node + 3] / scale
-                )
-                displacement_vector = (
-                    coords
-                    + displacement[DOF * node : DOF * node + 3]
-                    * self.bc[DOF * node : DOF * node + 3]
-                )
-                ax.plot(
-                    [coords[0], residual_vector[0]],
-                    [coords[1], residual_vector[1]],
-                    [coords[2], residual_vector[2]],
-                    color="green",
-                    linewidth=2,
-                    label="Residual Force Vector" if node == 0 else None,
-                )
-                ax.plot(
-                    [coords[0], displacement_vector[0]],
-                    [coords[1], displacement_vector[1]],
-                    [coords[2], displacement_vector[2]],
-                    color="orange",
-                    linewidth=2,
-                    label="Displacement Response" if node == 0 else None,
-                )
-                ax.plot(
-                    [coords[0], external_force_vector[0]],
-                    [coords[1], external_force_vector[1]],
-                    [coords[2], external_force_vector[2]],
-                    color="red",
-                    linewidth=2,
-                    label="External Force Vector" if node == 0 else None,
-                )
-        ax.set(xlabel="X", ylabel="Y", zlabel="Z")
-        xlim = ax.get_xlim()
-        ylim = ax.get_ylim()
-        zlim = ax.get_zlim()
-        xmid = (xlim[0] + xlim[1]) / 2
-        ymid = (ylim[0] + ylim[1]) / 2
-        zmid = (zlim[0] + zlim[1]) / 2
-        maximum = max(xlim[1]-xlim[0], ylim[1]-ylim[0], zlim[1]-zlim[0])
-        ax.set_xlim([xmid - maximum / 2, xmid + maximum / 2])
-        ax.set_ylim([ymid - maximum / 2, ymid + maximum / 2])
-        ax.set_zlim([zmid - maximum / 2, zmid + maximum / 2])
-        ax.set_box_aspect([1, 1, 1])
-        if show_legend:
-            ax.legend()
-        if show_plot:
-            plt.show()
-        return ax, fig
-
-    def plot_convergence(self, ax=None, fig=None, show_plot=True):
-        if fig is None:
-            fig = plt.figure()
-        if ax is None:
-            ax = fig.add_subplot(111)
-        ax.plot(self.iteration_history, self.residual_norm_history)
-        ax.set(xlabel="Iteration", ylabel="Residual")
-        if show_plot:
-            plt.show()
-        return ax, fig

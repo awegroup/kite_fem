@@ -28,6 +28,7 @@ def solve_tip_load(inflatable_beam,tip_load):
             I_stiffness=25
             )
     deflection = -inflatable_beam.coords_current[-2]*1000
+    inflatable_beam.reinitialise()
     return deflection
 
 
@@ -44,6 +45,7 @@ def solve_tip_moment(inflatable_beam,tip_moment):
             I_stiffness=25
             )
     rotation = -np.rad2deg(inflatable_beam.coords_rotations_current[-3])
+    inflatable_beam.reinitialise()
     return rotation
 
 pressures = [0.3,0.4,0.5]
@@ -54,7 +56,7 @@ for pressure,diameter in zip(pressures,diameters):
     inflatable_beam = instiantiate(diameter,pressure)
     inflatable_beams.append(inflatable_beam)
 
-tip_loads = np.arange(5,35,10)
+tip_loads = np.arange(0,40,10)
 tip_moments = np.arange(0,60,10)
 fig, ax = plt.subplots()
 for inflatable_beam in inflatable_beams:
@@ -66,12 +68,15 @@ for inflatable_beam in inflatable_beams:
     for tip_moment in tip_moments:
         rotation = solve_tip_moment(inflatable_beam,tip_moment)
         rotations.append(rotation)
-    ax.scatter(deflections,tip_loads,marker="+")
-    ax.scatter(rotations,tip_moments,marker="+")
+    ax.plot(deflections,tip_loads)
+    ax.plot(rotations,tip_moments)
 
 
-
-
+ax.set_xlabel("Deflection [mm] / Rotation [deg]")
+ax.set_ylabel("Tip Load [N] / Tip Moment [Nm]")
+ax.legend(['p=0.3kPa','p=0.4kPa','p=0.5kPa','p=0.3kPa','p=0.4kPa','p=0.5kPa'])
+ax.set_title("Inflatable Beam Tip Load and Moment Response d=13cm")
+ax.grid()
 
 plt.show()
     
