@@ -78,7 +78,7 @@ class FEM_structure:
 
     def __setup_spring_elements(self, connectivity_matrix):
         for n1, n2, k, c, l0, springtype in connectivity_matrix:
-            #initialise sprint element and assign properties
+            #initialise spring element and assign properties
             spring_element = SpringElement(n1, n2, self.__init_KC0)
             spring_element.set_spring_properties(l0, k, springtype)
             self.spring_elements.append(spring_element)
