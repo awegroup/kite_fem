@@ -1,31 +1,24 @@
 import numpy as np
 from pyfe3d.beamprop import BeamProp
-from pyfe3d import BeamC, BeamCProbe
+from pyfe3d import BeamC, BeamCProbe, DOF
 
 class BeamElement:
     def __init__(self, n1 : int, n2 : int, init_k_KC0 : int, N: int):
-        self.DOF = 6
+        #initialising pyfe3d BeamC element
         beamprobe = BeamCProbe()
         self.beam = BeamC(beamprobe)
         self.prop = BeamProp()
         self.beam.init_k_KC0 = init_k_KC0
         self.beam.n1 = n1
         self.beam.n2 = n2
-        self.beam.c1 = self.DOF * n1
-        self.beam.c2 = self.DOF * n2
+        self.beam.c1 = DOF * n1
+        self.beam.c2 = DOF * n2
         self.update_KC0v_only = 0
-        self.fi = np.zeros(N, dtype=np.float64)
-        self.collapsed = False
 
     def set_inflatable_beam_properties(self,d,p,L):
         self.r = 0.5*d
-        self.t = 0.01*d
-        self.A = 2*np.pi*self.r*self.t
-        self.I = (np.pi/4)*(self.r**4 - (self.r - self.t)**4)
-        
-        # self.A = np.pi * self.r**2
-        # self.I = np.pi * self.r**4 / 4.0
-        
+        self.A = np.pi * self.r**2
+        self.I = np.pi * self.r**4 / 4.0
         self.J = self.I*2   
         self.prop.A = self.A
         self.prop.Ay = 0
@@ -160,16 +153,14 @@ class BeamElement:
     def reset(self,coords,displacement):
         self.update_rotation_matrix(coords)
         self.beam.update_probe_ue(displacement)
-        self.fi *=0
         self.update_inflatable_beam_properties()
 
-    def beam_internal_forces(self, displacement, coords: np.ndarray):
+    def beam_internal_forces(self, displacement: np.ndarray, coords: np.ndarray,fi: np.ndarray):
         self.update_rotation_matrix(coords)
         self.beam.update_probe_ue(displacement)
         self.update_inflatable_beam_properties()
-        self.fi *= 0
-        self.beam.update_fint(self.fi,self.prop)
-        return self.fi.copy()
+        self.beam.update_fint(fi,self.prop)
+        return fi
         
         
         
