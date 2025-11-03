@@ -141,7 +141,7 @@ class FEM_structure:
         self.Kbc= self.KC0[self.bc, :][:, self.bc]
     
     def update_internal_forces(self):
-        self.fi = np.zeros(self.N, dtype=DOUBLE)
+        self.fi *= 0
         #Add spring and pulley internal forces
         for spring_element in self.spring_elements:
             #retrieve internal forces from spring element
