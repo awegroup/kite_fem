@@ -133,19 +133,8 @@ for n1,n2 in zip(n1s_tether,n2s_tether):
     spring_matrix.append([n1,n2,k,c,0,"default"])
 
 #beam
-t = 0.001
 d = 0.18
-r = d/2
-p = 0.2
-v= 0.03
-L_y = span/elements_per_beam 
-L_x = chord/elements_per_beam
-EI_x = F_inflatablebeam(p,r,v)*chord/(3*v)
-EI_y = F_inflatablebeam(p,r,v)*span/(3*v)
-A = np.pi*(r**2 - (r-t)**2)  # 
-I = (np.pi/4)*(r**4 - (r-t)**4)  # m^4
-E_x = EI_x/I
-E_y = EI_y/I
+p = 0.3
 
 
 for n1,n2 in zip(n1s_beam_x,n2s_beam_x):
@@ -197,7 +186,7 @@ def create_uniform_load(nodes_per_beam, chord, span, total_force):
     return -fe
 
 # Example usage:
-total_force = 200  # N, adjust as needed
+total_force = 300  # N, adjust as needed
 fe = create_uniform_load(nodes_per_beam, chord, span, total_force)
 
 # ax,fig = canopy.plot_3D(show_plot=False)
