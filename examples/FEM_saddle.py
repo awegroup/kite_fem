@@ -1,117 +1,139 @@
 import matplotlib.pyplot as plt
 from kite_fem.FEMStructure import FEM_structure
 from kite_fem.Plotting import plot_structure, plot_convergence
+import numpy as np
 
-# Define initial conditions and connectivity matrix
-initial_conditions = [
-    [[0.0, 0, 0.0], [0, 0, 0], 1, True],
-    [[2.5, 0, 1.25], [0, 0, 0], 1, True],
-    [[5.0, 0, 2.5], [0, 0, 0], 1, True],
-    [[7.5, 0, 3.75], [0, 0, 0], 1, True],
-    [[10.0, 0, 5.0], [0, 0, 0], 1, True],
-    [[1.25, 1.25, 2.5], [0, 0, 0], 1, False],
-    [[3.75, 1.25, 2.5], [0, 0, 0], 1, False],
-    [[6.25, 1.25, 2.5], [0, 0, 0], 1, False],
-    [[8.75, 1.25, 2.5], [0, 0, 0], 1, False],
-    [[0.0, 2.5, 1.25], [0, 0, 0], 1, True],
-    [[2.5, 2.5, 2.5], [0, 0, 0], 1, False],
-    [[5.0, 2.5, 2.5], [0, 0, 0], 1, False],
-    [[7.5, 2.5, 2.5], [0, 0, 0], 1, False],
-    [[10.0, 2.5, 3.75], [0, 0, 0], 1, True],
-    [[1.25, 3.75, 2.5], [0, 0, 0], 1, False],
-    [[3.75, 3.75, 2.5], [0, 0, 0], 1, False],
-    [[6.25, 3.75, 2.5], [0, 0, 0], 1, False],
-    [[8.75, 3.75, 2.5], [0, 0, 0], 1, False],
-    [[0.0, 5.0, 2.5], [0, 0, 0], 1, True],
-    [[2.5, 5.0, 2.5], [0, 0, 0], 1, False],
-    [[5.0, 5.0, 2.5], [0, 0, 0], 1, False],
-    [[7.5, 5.0, 2.5], [0, 0, 0], 1, False],
-    [[10.0, 5.0, 2.5], [0, 0, 0], 1, True],
-    [[1.25, 6.25, 2.5], [0, 0, 0], 1, False],
-    [[3.75, 6.25, 2.5], [0, 0, 0], 1, False],
-    [[6.25, 6.25, 2.5], [0, 0, 0], 1, False],
-    [[8.75, 6.25, 2.5], [0, 0, 0], 1, False],
-    [[0.0, 7.5, 3.75], [0, 0, 0], 1, True],
-    [[2.5, 7.5, 2.5], [0, 0, 0], 1, False],
-    [[5.0, 7.5, 2.5], [0, 0, 0], 1, False],
-    [[7.5, 7.5, 2.5], [0, 0, 0], 1, False],
-    [[10.0, 7.5, 1.25], [0, 0, 0], 1, True],
-    [[1.25, 8.75, 2.5], [0, 0, 0], 1, False],
-    [[3.75, 8.75, 2.5], [0, 0, 0], 1, False],
-    [[6.25, 8.75, 2.5], [0, 0, 0], 1, False],
-    [[8.75, 8.75, 2.5], [0, 0, 0], 1, False],
-    [[0.0, 10.0, 5.0], [0, 0, 0], 1, True],
-    [[2.5, 10.0, 3.75], [0, 0, 0], 1, True],
-    [[5.0, 10.0, 2.5], [0, 0, 0], 1, True],
-    [[7.5, 10.0, 1.25], [0, 0, 0], 1, True],
-    [[10.0, 10.0, 0.0], [0, 0, 0], 1, True],
-]
-spring_matrix = [
-    [0, 5, 9, 1, 0, "default"],
-    [5, 1, 9, 1, 0, "default"],
-    [5, 9, 9, 1, 0, "default"],
-    [5, 10, 9, 1, 0, "default"],
-    [6, 1, 9, 1, 0, "default"],
-    [6, 2, 9, 1, 0, "default"],
-    [6, 10, 9, 1, 0, "default"],
-    [6, 11, 9, 1, 0, "default"],
-    [7, 2, 9, 1, 0, "default"],
-    [7, 3, 9, 1, 0, "default"],
-    [7, 11, 9, 1, 0, "default"],
-    [7, 12, 9, 1, 0, "default"],
-    [8, 3, 9, 1, 0, "default"],
-    [8, 4, 9, 1, 0, "default"],
-    [8, 12, 9, 1, 0, "default"],
-    [8, 13, 9, 1, 0, "default"],
-    [10, 14, 9, 1, 0, "default"],
-    [10, 15, 9, 1, 0, "default"],
-    [11, 15, 9, 1, 0, "default"],
-    [11, 16, 9, 1, 0, "default"],
-    [12, 16, 9, 1, 0, "default"],
-    [12, 17, 9, 1, 0, "default"],
-    [14, 9, 9, 1, 0, "default"],
-    [14, 18, 9, 1, 0, "default"],
-    [14, 19, 9, 1, 0, "default"],
-    [15, 19, 9, 1, 0, "default"],
-    [15, 20, 9, 1, 0, "default"],
-    [16, 20, 9, 1, 0, "default"],
-    [16, 21, 9, 1, 0, "default"],
-    [17, 13, 9, 1, 0, "default"],
-    [17, 21, 9, 1, 0, "default"],
-    [17, 22, 9, 1, 0, "default"],
-    [19, 23, 9, 1, 0, "default"],
-    [19, 24, 9, 1, 0, "default"],
-    [20, 24, 9, 1, 0, "default"],
-    [20, 25, 9, 1, 0, "default"],
-    [21, 25, 9, 1, 0, "default"],
-    [21, 26, 9, 1, 0, "default"],
-    [23, 18, 9, 1, 0, "default"],
-    [23, 27, 9, 1, 0, "default"],
-    [23, 28, 9, 1, 0, "default"],
-    [24, 28, 9, 1, 0, "default"],
-    [24, 29, 9, 1, 0, "default"],
-    [25, 29, 9, 1, 0, "default"],
-    [25, 30, 9, 1, 0, "default"],
-    [26, 22, 9, 1, 0, "default"],
-    [26, 30, 9, 1, 0, "default"],
-    [26, 31, 9, 1, 0, "default"],
-    [28, 32, 9, 1, 0, "default"],
-    [28, 33, 9, 1, 0, "default"],
-    [29, 33, 9, 1, 0, "default"],
-    [29, 34, 9, 1, 0, "default"],
-    [30, 34, 9, 1, 0, "default"],
-    [30, 35, 9, 1, 0, "default"],
-    [32, 27, 9, 1, 0, "default"],
-    [32, 36, 9, 1, 0, "default"],
-    [32, 37, 9, 1, 0, "default"],
-    [33, 37, 9, 1, 0, "default"],
-    [33, 38, 9, 1, 0, "default"],
-    [34, 38, 9, 1, 0, "default"],
-    [34, 39, 9, 1, 0, "default"],
-    [35, 31, 9, 1, 0, "default"],
-    [35, 39, 9, 1, 0, "default"],
-    [35, 40, 9, 1, 0, "default"],
-]
+#Input file taken from https://github.com/awegroup/Particle_System_Simulator/blob/main/examples/saddle_form/saddle_form_input.py
+
+# grid discretization
+grid_size = 8
+grid_length = 10
+grid_height = 5
+
+
+def connectivity_matrix(grid_size: int, params: dict):
+    n = grid_size**2 + (grid_size - 1) ** 2
+    top_edge = [i for i in range(grid_size)]
+    bottom_edge = [n - grid_size + i for i in range(grid_size)]
+    left_edge = [(grid_size * 2 - 1) * i for i in range(1, grid_size - 1)]
+    right_edge = [left_edge[i] + grid_size - 1 for i in range(grid_size - 2)]
+    fixed_nodes = top_edge + bottom_edge + left_edge + right_edge
+
+    connections = []
+
+    # inner grid connections
+    for i in range(n):
+        if i not in fixed_nodes:
+            connections.append([i, i - grid_size, params["k"], params["c"]])
+            connections.append([i, i - grid_size + 1, params["k"], params["c"]])
+            connections.append([i, i + grid_size - 1, params["k"], params["c"]])
+            connections.append([i, i + grid_size, params["k"], params["c"]])
+
+    # Filtering duplicates
+    filtered_connections = []
+    for link in connections:
+        inverted_link = [link[1], link[0], *link[2:]]
+        if (
+            inverted_link not in filtered_connections
+            and link not in filtered_connections
+        ):
+            filtered_connections.append(link)
+    print(
+        f"Filtered connections from {len(connections)} down to {len(filtered_connections)}"
+    )
+    return filtered_connections, fixed_nodes
+
+
+def initial_conditions(
+    g_size: int, m_segment: float, fixed_nodes: list, g_h: float, g_l: float
+):
+    conditions = []
+
+    orthogonal_distance = g_l / (g_size - 1)
+    dl = g_h / g_l * orthogonal_distance
+    even = [i * orthogonal_distance for i in range(g_size)]
+    uneven = [
+        i * orthogonal_distance + 0.5 * orthogonal_distance for i in range(g_size - 1)
+    ]
+    x_y = [[i * orthogonal_distance, 0] for i in range(g_size)]
+
+    for i in range(g_size - 1):
+        x_y.extend(
+            list(
+                zip(
+                    uneven,
+                    [
+                        i * orthogonal_distance + 0.5 * orthogonal_distance
+                        for j in range(len(uneven))
+                    ],
+                )
+            )
+        )
+        x_y.extend(
+            list(zip(even, [(i + 1) * orthogonal_distance for j in range(len(even))]))
+        )
+
+    z = [i * dl for i in range(g_size)]
+    temp = z.copy()
+    z.extend(reversed(temp))
+    z.extend(temp[1:-1])
+    z.extend(reversed(temp[1:-1]))
+
+    n = g_size**2 + (g_size - 1) ** 2
+
+    for i in range(n):
+        if i in fixed_nodes:
+            conditions.append(
+                [list(x_y[i]) + [z[fixed_nodes.index(i)]], [0, 0, 0], m_segment, True]
+            )
+        else:
+            conditions.append([list(x_y[i]) + [g_h / 2], [0, 0, 0], m_segment, False])
+
+    return conditions
+
+
+# dictionary of required parameters
+params = {
+    # model parameters
+    "n": 10,  # [-]       number of particles
+    "k_t": 1,  # [N/m]     spring stiffness
+    "c": 1,  # [N s/m] damping coefficient
+    "L": 10,  # [m]       tether length
+    "m_block": 100,  # [kg]     mass attached to end of tether
+    "rho_tether": 0.1,  # [kg/m]    mass density tether
+    # simulation settings
+    "dt": 0.1,  # [s]       simulation timestep
+    "t_steps": 1000,  # [-]      number of simulated time steps
+    "abs_tol": 1e-50,  # [m/s]     absolute error tolerance iterative solver
+    "rel_tol": 1e-5,  # [-]       relative error tolerance iterative solver
+    "max_iter": 1e5,  # [-]       maximum number of iterations
+    # physical parameters
+    "g": 9.807,  # [m/s^2]   gravitational acceleration
+    "v_w": [5, 0, 0],  # [m/s]     wind velocity vector
+    "rho": 1.225,  # [kg/ m3]  air density
+    "c_d_bridle": 1.05,  # [-]       drag-coefficient of bridles
+    "d_bridle": 0.02,  # [m]       diameter of bridle lines
+}
+
+# calculated parameters
+params["l0"] = 0  # np.sqrt( 2 * (grid_length/(grid_size-1))**2)
+params["m_segment"] = 1
+params["k"] = params["k_t"] * (params["n"] - 1)  # segment stiffness
+params["n"] = grid_size**2 + (grid_size - 1) ** 2
+
+
+# instantiate connectivity matrix and initial conditions array
+connections, f_nodes = connectivity_matrix(grid_size, params)
+init_cond = initial_conditions(
+    grid_size, params["m_segment"], f_nodes, grid_height, grid_length
+)
+
+for connection in connections:
+    connection.append(params["l0"])
+    connection.append("default")  
+
+spring_matrix = connections
+initial_conditions = init_cond
 
 # Create FEM structure and solve
 SaddleForm = FEM_structure(initial_conditions, spring_matrix)
