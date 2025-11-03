@@ -1,5 +1,4 @@
-# Thesis
-Fast Structural Modeling of a Leading Edge Inflatable Kite
+Fast Structural Modeling of Leading Edge Inflatable Kites
 
 ## Installation Instructions
 
