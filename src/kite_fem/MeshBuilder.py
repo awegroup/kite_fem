@@ -158,6 +158,59 @@ class InteractiveMeshBuilder:
         # Return None if cancelled, otherwise return the selected value
         return result.get("value") if "value" in result else None
     
+    def get_fixed_status_choice(self, parent_title):
+        """Show a dialog with fixed status choices (True/False)"""
+        # Create a new window for the choice
+        choice_window = tk.Toplevel()
+        choice_window.title(parent_title + " - Fixed Status")
+        choice_window.geometry("300x200")
+        choice_window.resizable(False, False)
+        
+        # Center the window
+        choice_window.transient()
+        choice_window.grab_set()
+        
+        result = {"value": False}  # Default to False (not fixed)
+        
+        # Add label
+        label = tk.Label(choice_window, text="Is this point fixed in space?", font=("Arial", 12))
+        label.pack(pady=10)
+        
+        # Create variable for radio buttons
+        selected_fixed = tk.BooleanVar(value=False)
+        
+        # Add radio buttons
+        radio1 = tk.Radiobutton(choice_window, text="False (movable)", variable=selected_fixed, 
+                               value=False, font=("Arial", 11))
+        radio1.pack(pady=5)
+        
+        radio2 = tk.Radiobutton(choice_window, text="True (fixed)", variable=selected_fixed, 
+                               value=True, font=("Arial", 11))
+        radio2.pack(pady=5)
+        
+        # Button frame
+        button_frame = tk.Frame(choice_window)
+        button_frame.pack(pady=15)
+        
+        def on_ok():
+            result["value"] = selected_fixed.get()
+            choice_window.destroy()
+            
+        def on_cancel():
+            choice_window.destroy()
+        
+        # Add buttons
+        ok_button = tk.Button(button_frame, text="OK", command=on_ok, width=8)
+        ok_button.pack(side=tk.LEFT, padx=5)
+        
+        cancel_button = tk.Button(button_frame, text="Cancel", command=on_cancel, width=8)
+        cancel_button.pack(side=tk.LEFT, padx=5)
+        
+        # Wait for window to be closed
+        choice_window.wait_window()
+        
+        return result["value"]
+    
     def get_beam_properties(self, n1, n2):
         """Get beam properties from user input dialog"""
         root = tk.Tk()
@@ -385,14 +438,14 @@ class InteractiveMeshBuilder:
             return
             
         # Get coordinates from dialog (ignore click position)
-        coords = self.get_point_coordinates()
-        if coords is None:
+        coords_data = self.get_point_coordinates()
+        if coords_data is None:
             return
             
-        self.add_point(coords)
+        self.add_point(coords_data['coordinates'], coords_data['fixed'])
     
     def get_point_coordinates(self):
-        """Get point coordinates from user input dialog"""
+        """Get point coordinates and fixed status from user input dialog"""
         root = tk.Tk()
         root.withdraw()
         
@@ -428,22 +481,28 @@ class InteractiveMeshBuilder:
             root.destroy()
             return None
         
+        # Get fixed status
+        fixed_status = self.get_fixed_status_choice(dialog_title)
+        if fixed_status is None:
+            root.destroy()
+            return None
+        
         root.destroy()
         
         try:
             x = float(x_input.strip())
             y = float(y_input.strip())
             z = float(z_input.strip())
-            return [x, y, z]
+            return {'coordinates': [x, y, z], 'fixed': fixed_status}
         except ValueError:
             print("Invalid coordinates entered!")
             return None
     
-    def add_point(self, coordinates):
+    def add_point(self, coordinates, fixed=False):
         """Add a new point to the mesh"""
         # Create new initial condition entry
         # Format: [position, velocity, mass, fixed]
-        new_ic = [coordinates, [0.0, 0.0, 0.0], 1.0, False]
+        new_ic = [coordinates, [0.0, 0.0, 0.0], 1.0, fixed]
         
         # Add to initial conditions
         self.initial_conditions.append(new_ic)
@@ -456,15 +515,50 @@ class InteractiveMeshBuilder:
             
         self.num_points = len(self.points)
         
-        print(f"✓ Added point {self.num_points-1} at {coordinates}")
+        fixed_status = "fixed" if fixed else "movable"
+        print(f"✓ Added point {self.num_points-1} at {coordinates} ({fixed_status})")
+        
+        # Update axes size to accommodate new point
+        self.update_axes_size()
         
         # Update the display
         self.update_display()
+    
+    def update_axes_size(self):
+        """Update axes limits to accommodate all points with some padding"""
+        if len(self.points) == 0:
+            return
+            
+        # Get min/max coordinates
+        min_coords = np.min(self.points, axis=0)
+        max_coords = np.max(self.points, axis=0)
+        
+        # Add padding (20% of range)
+        ranges = max_coords - min_coords
+        padding = np.maximum(ranges * 0.2, 1.0)  # Minimum padding of 1.0
+        
+        # Set new limits
+        self.ax.set_xlim(min_coords[0] - padding[0], max_coords[0] + padding[0])
+        self.ax.set_ylim(min_coords[1] - padding[1], max_coords[1] + padding[1])
+        self.ax.set_zlim(min_coords[2] - padding[2], max_coords[2] + padding[2])
+        
+        # Keep equal aspect ratio
+        self.set_equal_axes()
         
     def print_matrices(self):
         """Helper method to print the matrices without closing the plot"""
+        print(f"\n# Initial Conditions Matrix ({len(self.initial_conditions)} points)")
+        print("# Format: [position, velocity, mass, fixed]")
+        if self.initial_conditions:
+            print("initial_conditions = [")
+            for ic in self.initial_conditions:
+                print(f"    {ic},")
+            print("]")
+        else:
+            print("initial_conditions = []")
+        
         print(f"\n# Spring Matrix ({len(self.spring_matrix)} connections)")
-        print("# Format: [n1, n2, k, c , l0, springtype]")
+        print("# Format: [n1, n2, k, c, l0, springtype]")
         if self.spring_matrix:
             print("spring_matrix = [")
             for spring in self.spring_matrix:
@@ -495,6 +589,7 @@ class InteractiveMeshBuilder:
         
         print("\n" + "="*80)
         print("SUMMARY:")
+        print(f"Points: {len(self.initial_conditions)}")
         print(f"Springs: {len(self.spring_matrix)}")
         print(f"Beams: {len(self.beam_matrix)}")  
         print(f"Pulleys: {len(self.pulley_matrix)}")
