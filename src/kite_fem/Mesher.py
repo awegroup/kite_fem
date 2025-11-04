@@ -109,7 +109,7 @@ class InteractiveMeshBuilder:
         # Create a new window for the choice
         choice_window = tk.Toplevel()
         choice_window.title(parent_title + " - Spring Type")
-        choice_window.geometry("300x150")
+        choice_window.geometry("300x200")
         choice_window.resizable(False, False)
         
         # Center the window
@@ -209,16 +209,6 @@ class InteractiveMeshBuilder:
             root.destroy()
             return None
             
-        # Get damping coefficient
-        c_input = simpledialog.askstring(
-            dialog_title,
-            f"Enter damping coefficient c (current: {self.pulley_c}):",
-            initialvalue=str(self.pulley_c)
-        )
-        if c_input is None:
-            root.destroy()
-            return None
-            
         # Get rest length
         l0_input = simpledialog.askstring(
             dialog_title,
@@ -236,7 +226,6 @@ class InteractiveMeshBuilder:
         
         return {
             'k': k_input.strip(),
-            'c': c_input.strip(),
             'l0': l0
         }
         
@@ -475,7 +464,7 @@ class InteractiveMeshBuilder:
     def print_matrices(self):
         """Helper method to print the matrices without closing the plot"""
         print(f"\n# Spring Matrix ({len(self.spring_matrix)} connections)")
-        print("# Format: [n1, n2, k, l0, type]")
+        print("# Format: [n1, n2, k, c , l0, springtype]")
         if self.spring_matrix:
             print("spring_matrix = [")
             for spring in self.spring_matrix:
@@ -485,7 +474,7 @@ class InteractiveMeshBuilder:
             print("spring_matrix = []")
         
         print(f"\n# Beam Matrix ({len(self.beam_matrix)} connections)")
-        print("# Format: [n1, n2, diameter, pressure]")
+        print("# Format: [n1, n2, d, p]")
         if self.beam_matrix:
             print("beam_matrix = [")
             for beam in self.beam_matrix:
@@ -535,7 +524,7 @@ class InteractiveMeshBuilder:
         # Use current length if l0 is empty, otherwise use provided value
         l0 = current_length if properties['l0'] == current_length else properties['l0']
         
-        spring_conn = [n1, n2, properties['k'], l0, properties['type']]
+        spring_conn = [n1, n2, properties['k'], 0,  l0, properties['type']]
         self.spring_matrix.append(spring_conn)
         
         # Add visual line
@@ -544,7 +533,7 @@ class InteractiveMeshBuilder:
         self.connection_lines.append(('spring', line))
         
         self.selected_points = []
-        print(f"✓ Spring created: nodes {n1}-{n2}, k={properties['k']}, l0={l0}, type={properties['type']}")
+        print(f"✓ Spring created: nodes {n1}-{n2}, k={properties['k']}, c={0}, l0={l0}, type={properties['type']}")
         
     def create_beam(self):
         if len(self.selected_points) != 2:
@@ -588,7 +577,7 @@ class InteractiveMeshBuilder:
         # Use current length if l0 is empty, otherwise use provided value
         l0 = current_length if properties['l0'] == current_length else properties['l0']
         
-        pulley_conn = [n1, n2, n3, properties['k'], properties['c'], l0]
+        pulley_conn = [n1, n2, n3, properties['k'], 0, l0]
         self.pulley_matrix.append(pulley_conn)
         
         # Add visual lines
@@ -600,7 +589,7 @@ class InteractiveMeshBuilder:
         self.connection_lines.append(('pulley', line2))
         
         self.selected_points = []
-        print(f"✓ Pulley created: nodes {n1}-{n2}-{n3}, k={properties['k']}, c={properties['c']}, l0={l0}")
+        print(f"✓ Pulley created: nodes {n1}-{n2}-{n3}, k={properties['k']}, c={0}, l0={l0}")
         
     def undo_last(self):
         if not self.connection_lines:
@@ -773,56 +762,3 @@ Point numbers are shown as text labels next to each point.
         plt.show()
 
 
-def main():
-    """Load initial conditions from FEM_kite example and start interactive builder"""
-    
-    # Initial conditions from FEM_kite.py  
-    initial_conditions = [
-        [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 0.661345363420986, True], 
-        [[1.5450326776836745, 4.130039796867375, 7.261364950271782], [0.0, 0.0, 0.0], 0.6054251074570364, False], 
-        [[-0.01769468978128639, 3.9841196033007544, 8.497033387639695], [0.0, 0.0, 0.0], 0.5707213947602356, False], 
-        [[-0.23864988658488862, 3.147085371141592, 9.816746227504566], [0.0, 0.0, 0.0], 0.5752129756233141, False], 
-        [[-0.3852940131556698, 1.9677011127725468, 10.6073565473802], [0.0, 0.0, 0.0], 0.5760255005323119, False], 
-        [[-0.4584192791195412, 0.6669541551721638, 10.948973784300064], [0.0, 0.0, 0.0], 0.5788983834737577, False], 
-        [[-0.4584192791195412, -0.6669541551721638, 10.948973784300064], [0.0, 0.0, 0.0], 0.5788983834737577, False], 
-        [[-0.3852940131556698, -1.9677011127725468, 10.6073565473802], [0.0, 0.0, 0.0], 0.5760255005323119, False], 
-        [[-0.23864988658488862, -3.147085371141592, 9.816746227504566], [0.0, 0.0, 0.0], 0.5752129756233141, False], 
-        [[-0.01769468978128639, -3.9841196033007544, 8.497033387639695], [0.0, 0.0, 0.0], 0.5707213947602356, False], 
-        [[1.5450326776836745, -4.130039796867375, 7.261364950271782], [0.0, 0.0, 0.0], 0.6054251074570364, False], 
-        [[1.7103966474299823, -3.9715968676171474, 8.492040169869373], [0.0, 0.0, 0.0], 0.5654576443671213, False], 
-        [[2.0106621688737727, -3.12943184814695, 9.787197879905024], [0.0, 0.0, 0.0], 0.5728514884728007, False], 
-        [[2.118729000086964, -1.9545056515510937, 10.55854695742184], [0.0, 0.0, 0.0], 0.575770732822115, False], 
-        [[2.16733994663813, -0.6634087911809183, 10.889841638961673], [0.0, 0.0, 0.0], 0.578854001974007, False], 
-        [[2.16733994663813, 0.6634087911809183, 10.889841638961673], [0.0, 0.0, 0.0], 0.578854001974007, False], 
-        [[2.118729000086964, 1.9545056515510937, 10.55854695742184], [0.0, 0.0, 0.0], 0.575770732822115, False], 
-        [[2.0106621688737727, 3.12943184814695, 9.787197879905024], [0.0, 0.0, 0.0], 0.5728514884728007, False], 
-        [[1.7103966474299823, 3.9715968676171474, 8.492040169869373], [0.0, 0.0, 0.0], 0.5654576443671213, False], 
-        [[0.8630767430175426, 4.1565, 7.423819809051551], [0.0, 0.0, 0.0], 0.6206859968952704, False], 
-        [[0.8630767430175426, -4.1565, 7.423819809051551], [0.0, 0.0, 0.0], 0.0706859968952703, False], 
-        [[0.17884119251811076, 0.0, 0.9330143770911036], [0.0, 0.0, 0.0], 8.447411093293947, False], 
-        [[0.4176659156066993, 0.0, 2.0047264427326446], [0.0, 0.0, 0.0], 0.06165064275796516, False], 
-        [[0.4765199236180079, 0.515701635045511, 2.4187272340933115], [0.0, 0.0, 0.0], 0.09102212303016835, False], 
-        [[1.0118690598081908, 0.85948465466864, 4.671178520435504], [0.0, 0.0, 0.0], 0.24485626871062102, False], 
-        [[1.447067774285811, 2.71993276851239, 7.354965134765166], [0.0, 0.0, 0.0], 0.0680648306878911, False], 
-        [[1.5342469795828642, 1.3437933594787979, 7.833401527870664], [0.0, 0.0, 0.0], 0.08390189207122503, False], 
-        [[0.4765199236180079, -0.515701635045511, 2.4187272340933115], [0.0, 0.0, 0.0], 0.09102212303016835, False], 
-        [[1.0118690598081908, -0.85948465466864, 4.671178520435504], [0.0, 0.0, 0.0], 0.24485626871062102, False], 
-        [[1.447067774285811, -2.71993276851239, 7.354965134765166], [0.0, 0.0, 0.0], 0.0680648306878911, False], 
-        [[1.5342469795828642, -1.3437933594787979, 7.833401527870664], [0.0, 0.0, 0.0], 0.08390189207122503, False], 
-        [[-0.06579255760134889, 1.3268467003328777, 5.531595097127407], [0.0, 0.0, 0.0], 0.12090058106424205, False], 
-        [[-0.042661843847079224, 2.0553030306836795, 7.2551007793587665], [0.0, 0.0, 0.0], 0.0628358384714946, False], 
-        [[-0.09211118715063556, 1.267408888894257, 7.827716375899725], [0.0, 0.0, 0.0], 0.07567094165901125, False], 
-        [[-0.06579255760134889, -1.3268467003328777, 5.531595097127407], [0.0, 0.0, 0.0], 0.12090058106424205, False], 
-        [[-0.042661843847079224, -2.0553030306836795, 7.2551007793587665], [0.0, 0.0, 0.0], 0.0628358384714946, False], 
-        [[-0.09211118715063556, -1.267408888894257, 7.827716375899725], [0.0, 0.0, 0.0], 0.07567094165901125, False]
-    ]
-    
-    print("Starting Interactive Mesh Builder with kite point cloud...")
-    print(f"Loaded {len(initial_conditions)} points")
-    
-    builder = InteractiveMeshBuilder(initial_conditions)
-    builder.run()
-
-
-if __name__ == "__main__":
-    main()
