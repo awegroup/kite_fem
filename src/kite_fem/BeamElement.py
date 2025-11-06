@@ -18,6 +18,9 @@ class BeamElement:
     def set_inflatable_beam_properties(self,d,p,L):
         self.r = 0.5*d
         self.k = 8/9
+        # self.t = 0.01*d  # wall thickness from pressure and radius
+        # self.A = 2 * np.pi * self.r * self.t  # thin-walled circular cross-sectional area
+        # self.I = np.pi * self.r**3 * self.t  # thin-walled circular second moment of area
         self.A = np.pi * self.r**2
         self.I = np.pi * self.r**4 / 4.0
         self.J = self.I*2   
@@ -37,10 +40,31 @@ class BeamElement:
         self.update_inflatable_beam_properties()
 
     def update_inflatable_beam_properties(self):
+        #rotation
+        rotation = self.get_beam_rotation()
+        C13 = 1467
+        C14 = 40.908
+        C15 = -191.8
+        C16 = 47.406
+        C17 = -17703
+        C18 = 358.05
+        C19 = 0.0918
+        c1 = ((C13*self.r+C14)*self.p+(C15*self.r+C16))
+        c2 = ((C17*self.r**4)*np.log(self.p)+(C18*self.r**3+C19))
+
+
+        if rotation <= 0.03:
+            rotation = 0.03
+
+        T = c1*np.arctan(c2*rotation)
+        GJ = T*1/(rotation)
+        self.G = GJ/self.J
+        self.prop.G = self.G
+
         #bending
         deflection = self.get_beam_deflection()
-        if deflection <= 0.01:
-            deflection = 0.01
+        if deflection <= 0.03:
+            deflection = 0.03
 
         C1 = 6582.82
         C2 = -272.43
@@ -55,34 +79,13 @@ class BeamElement:
         numer = (C5 * self.r**5 + C6) * self.p + (C7 * self.r + C8)
         #check scaling with wielgosz . Look for scaling / dimensions / dimensionless
 
-        F = denom * (1 - np.exp(-(numer / denom) * (deflection)))
+        P = denom * (1 - np.exp(-(numer / denom) * (deflection)))
 
-        EI = F*1**3/(3*(deflection-(F*1/(self.k*self.A*self.G))))
+        EI = P*1**3/(3*(deflection-(P*1/(self.k*self.A*self.G))))
+        
         # EI = max(EI,10)
         self.E = EI/self.I
         self.prop.E = self.E
-
-        #rotation
-        rotation = self.get_beam_rotation()
-        C13 = 1467
-        C14 = 40.908
-        C15 = -191.8
-        C16 = 47.406
-        C17 = -17703
-        C18 = 358.05
-        C19 = 0.0918
-        c1 = ((C13*self.r+C14)*self.p+(C15*self.r+C16))
-        c2 = ((C17*self.r**4)*np.log(self.p)+(C18*self.r**3+C19))
-
-
-        if rotation <= 0.01:
-            rotation = 0.01
-
-        T = c1*np.arctan(c2*rotation)
-        GJ = T*1/(rotation)
-        self.G = GJ/self.J
-        self.prop.G = self.G
-
 
     def set_beam_properties(self,E,A,I,L):
         self.prop.E = E
@@ -115,8 +118,13 @@ class BeamElement:
         # deflection_L2 = 1/(((self.p/self.A)+self.E)*self.I)*(self.I*self.L**2/2 - self.L**3/6)+self.L/(self.p+self.k*self.G*self.A)
         # scale = deflection_L1/deflection_L2
 
-        alpha = self.k*self.G*self.A/(3*self.E*self.I)
-        scale = (1+alpha)/(self.L*(1+alpha+self.L**2))
+        # alpha = self.k*self.G*self.A/(3*self.E*self.I)
+
+        # scale = (1+alpha)/(self.L+alpha*self.L**3)
+        def v(L):
+            return (1/(self.E)*(self.I*L**2/2-L**3/6)+L/(self.k*self.G*self.A))
+        
+        scale = v(1)/v(self.L)
         deflection = np.linalg.norm(tipdeflection - basedeflection)*scale
         
         C9 = 322.55

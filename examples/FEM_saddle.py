@@ -67,7 +67,7 @@ def initial_conditions(
                         for j in range(len(uneven))
                     ],
                 )
-            )
+            ) # type: ignore
         )
         x_y.extend(
             list(zip(even, [(i + 1) * orthogonal_distance for j in range(len(even))]))

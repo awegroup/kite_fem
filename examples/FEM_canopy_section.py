@@ -200,3 +200,6 @@ ax2.set_title("Deformed Configuration")
 ax3.set_title("Convergence History")
 plt.show()
 
+for beam in canopy.beam_elements:
+    print(beam.collapsed)
+
