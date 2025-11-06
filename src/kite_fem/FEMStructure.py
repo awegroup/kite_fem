@@ -4,7 +4,6 @@ from pyfe3d import DOF, INT, DOUBLE, SpringData, BeamCData
 from scipy.sparse import coo_matrix, identity
 from scipy.sparse.linalg import lsqr, spsolve
 import numpy as np
-import matplotlib.pyplot as plt
 import time
 import warnings
 

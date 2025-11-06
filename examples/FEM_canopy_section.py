@@ -182,7 +182,6 @@ def create_uniform_load(nodes_per_beam, chord, span, total_force):
         scale = -total_force / total_weight  # negative z-direction
         fe[2::6] *= scale
         fe[1::6] *= scale
-
     return -fe
 
 # Example usage:
@@ -190,9 +189,9 @@ total_force = 300  # N, adjust as needed
 fe = create_uniform_load(nodes_per_beam, chord, span, total_force)
 
 # ax,fig = canopy.plot_3D(show_plot=False)
-ax1,fig1 = plot_structure(canopy,fe=fe, plot_nodes=False)
+ax1,fig1 = plot_structure(canopy,fe=fe, plot_nodes=True)
 canopy.solve(fe=fe,max_iterations = 1000 ,I_stiffness=15,tolerance=5,relax_init=0.25,step_limit = 0.1)
-ax2,fig2 = plot_structure(canopy,fe=fe, plot_nodes=False)
+ax2,fig2 = plot_structure(canopy,fe=fe, plot_nodes=True)
 ax3,fig3 = plot_convergence(canopy)
 ax1.legend()
 ax2.legend()
@@ -200,3 +199,4 @@ ax1.set_title("Initial Configuration")
 ax2.set_title("Deformed Configuration")
 ax3.set_title("Convergence History")
 plt.show()
+
