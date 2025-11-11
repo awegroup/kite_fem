@@ -185,13 +185,17 @@ def create_uniform_load(nodes_per_beam, chord, span, total_force):
     return -fe
 
 # Example usage:
-total_force = 300  # N, adjust as needed
+total_force = 350  # N, adjust as needed
 fe = create_uniform_load(nodes_per_beam, chord, span, total_force)
-
 # ax,fig = canopy.plot_3D(show_plot=False)
+fez = fe[2::6]
+print(sum(fez))
 ax1,fig1 = plot_structure(canopy,fe=fe, plot_nodes=True)
 canopy.solve(fe=fe,max_iterations = 1000 ,I_stiffness=15,tolerance=5,relax_init=0.25,step_limit = 0.1)
 ax2,fig2 = plot_structure(canopy,fe=fe, plot_nodes=True)
+fi = canopy.fi
+fiz = fi[2::6]
+
 ax3,fig3 = plot_convergence(canopy)
 ax1.legend()
 ax2.legend()
@@ -201,5 +205,8 @@ ax3.set_title("Convergence History")
 plt.show()
 
 for beam in canopy.beam_elements:
-    print(beam.collapsed)
+    if beam.collapsed:
+        print("A beam has collapsed")
+        break
+
 

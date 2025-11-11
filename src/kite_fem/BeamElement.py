@@ -82,7 +82,7 @@ class BeamElement:
         P = denom * (1 - np.exp(-(numer / denom) * (deflection)))
 
         EI = P*1**3/(3*(deflection-(P*1/(self.k*self.A*self.G))))
-        
+        # E = self.p/
         # EI = max(EI,10)
         self.E = EI/self.I
         self.prop.E = self.E
@@ -119,12 +119,11 @@ class BeamElement:
         # scale = deflection_L1/deflection_L2
 
         # alpha = self.k*self.G*self.A/(3*self.E*self.I)
-
-        # scale = (1+alpha)/(self.L+alpha*self.L**3)
-        def v(L):
-            return (1/(self.E)*(self.I*L**2/2-L**3/6)+L/(self.k*self.G*self.A))
+        # alpha = 1
+        # scale = (1+alpha*1**3)/(self.L+alpha*self.L**3)
         
-        scale = v(1)/v(self.L)
+        scale = (1/self.L)
+
         deflection = np.linalg.norm(tipdeflection - basedeflection)*scale
         
         C9 = 322.55
