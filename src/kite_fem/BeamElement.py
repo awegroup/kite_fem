@@ -18,9 +18,6 @@ class BeamElement:
     def set_inflatable_beam_properties(self,d,p,L):
         self.r = 0.5*d
         self.k = 8/9
-        # self.t = 0.01*d  # wall thickness from pressure and radius
-        # self.A = 2 * np.pi * self.r * self.t  # thin-walled circular cross-sectional area
-        # self.I = np.pi * self.r**3 * self.t  # thin-walled circular second moment of area
         self.A = np.pi * self.r**2
         self.I = np.pi * self.r**4 / 4.0
         self.J = self.I*2   
@@ -77,13 +74,11 @@ class BeamElement:
         
         denom = (C1 * self.r + C2) * self.p**2 + (C3 * self.r**3 + C4)
         numer = (C5 * self.r**5 + C6) * self.p + (C7 * self.r + C8)
-        #check scaling with wielgosz . Look for scaling / dimensions / dimensionless
 
         P = denom * (1 - np.exp(-(numer / denom) * (deflection)))
 
         EI = P*1**3/(3*(deflection-(P*1/(self.k*self.A*self.G))))
-        # E = self.p/
-        # EI = max(EI,10)
+
         self.E = EI/self.I
         self.prop.E = self.E
 
@@ -104,26 +99,7 @@ class BeamElement:
     def get_beam_deflection(self):
         tipdeflection = np.array(self.beam.probe.ue[7:9])
         basedeflection = np.array(self.beam.probe.ue[1:3])
-        # sigma = 2
-        # mu = 1
-
-        # # short beams should be n = 1, long beams go to n=3
-
-        # # if self.L < 1:
-        # #     n = 1.0 + 2*np.exp(- (self.L - mu) ** 2) / (2 * sigma ** 2)
-        # # else:
-        # #     # n=1.6
-        # #     n = 1.0 + 2*np.exp(- (1/self.L - mu) ** 2) / (2 * sigma ** 2)
-        # deflection_L1 = 1/((self.p/self.A)*self.I)*(self.I*1**2/2 - 1**3/6)+1/self.p
-        # deflection_L2 = 1/(((self.p/self.A)+self.E)*self.I)*(self.I*self.L**2/2 - self.L**3/6)+self.L/(self.p+self.k*self.G*self.A)
-        # scale = deflection_L1/deflection_L2
-
-        # alpha = self.k*self.G*self.A/(3*self.E*self.I)
-        # alpha = 1
-        # scale = (1+alpha*1**3)/(self.L+alpha*self.L**3)
-        
         scale = (1/self.L)
-
         deflection = np.linalg.norm(tipdeflection - basedeflection)*scale
         
         C9 = 322.55
