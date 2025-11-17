@@ -20,7 +20,7 @@ ax,fig = plot_structure(kite,fe=fe,plot_displacements=True)
 
 kite.solve(fe=fe, max_iterations=1000, tolerance=1, step_limit=0.1, relax_init=.25, relax_update=0.95, k_update=1)
 
-ax2,fig2 = plot_structure(kite,fe=fe,plot_displacements=True)
+ax2,fig2 = plot_structure(kite,fe=fe,plot_displacements=True,plot_2d=True,plot_2d_plane='xz')
 ax3,fig3 = plot_convergence(kite)
 ax.legend()
 ax2.legend()
