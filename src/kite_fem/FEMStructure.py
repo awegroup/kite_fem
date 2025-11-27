@@ -6,6 +6,7 @@ from scipy.sparse.linalg import lsqr, spsolve
 import numpy as np
 import time
 import warnings
+import pandas as pd
 
 
 class FEM_structure:
@@ -35,6 +36,7 @@ class FEM_structure:
         self.__setup_initial_conditions(initial_conditions)
         self.spring_elements = []
         self.beam_elements = []
+        self.pulley_ids = []
         if spring_matrix is not None:
             self.__setup_spring_elements(spring_matrix)
         if pulley_matrix is not None:
@@ -85,7 +87,7 @@ class FEM_structure:
             self.__init_KC0 += self.__springdata.KC0_SPARSE_SIZE
             #fixes rotational DOF's for the nodes connected by the spring
             for id in [n1, n2]:
-                self.bc[DOF * id+3 : DOF * id + 6] = False
+                self.bc[DOF * id+3 : DOF * id + 6] = True
 
     def __setup_pulley_elements(self, connectivity_matrix):
         for n1, n2, n3, k, c, l0 in connectivity_matrix:
@@ -104,15 +106,15 @@ class FEM_structure:
             #update index for sparse stiffness matrix (required for pyfe3d)
             self.__init_KC0 += self.__springdata.KC0_SPARSE_SIZE
             #fixes rotational DOF's for the nodes connected by the springs
+            self.pulley_ids.append(n2)
             for id in [n1, n2, n3]:
                 self.bc[DOF * id+3 : DOF * id + 6] = False
                 
     def __setup_beam_elements(self, connectivity_matrix): #TODO move L to connectivity matrix
-        for n1, n2, d, p in connectivity_matrix:
+        for n1, n2, d, p, l0 in connectivity_matrix:
             #initialise beam element and assign properties
             beam_element = BeamElement(n1, n2, self.__init_KC0,self.N)
-            L = beam_element.unit_vector(self.coords_init)[1] 
-            beam_element.set_inflatable_beam_properties(d,p,L)
+            beam_element.set_inflatable_beam_properties(d,p,l0)
             self.beam_elements.append(beam_element)
             #update index for sparse stiffness matrix (required for pyfe3d)
             self.__init_KC0 += self.__beamdata.KC0_SPARSE_SIZE
@@ -128,9 +130,8 @@ class FEM_structure:
         #Update stiffness matrix due to beam elements
         for beam_element in self.beam_elements:
             self.__KC0r, self.__KC0c, self.__KC0v = beam_element.update_KC0(self.__KC0r, self.__KC0c, self.__KC0v, self.coords_current)
-
-        if np.count_nonzero(np.isnan(self.__KC0v)) > 0:
-            raise ValueError("NaN detected in stiffness matrix")
+        # if np.count_nonzero(np.isnan(self.__KC0v)) > 0:
+        #     raise ValueError("NaN detected in stiffness matrix")
         
         # Assemble global stiffness matrix        
         self.KC0 = coo_matrix((self.__KC0v, (self.__KC0r, self.__KC0c)), shape=(self.N, self.N)).tocsc()
@@ -138,6 +139,7 @@ class FEM_structure:
         self.KC0 += self.__identity_matrix*self.__I_stiffness
         # Extract matrix for free DOF's
         self.Kbc= self.KC0[self.bc, :][:, self.bc]
+
     
     def update_internal_forces(self):
         self.fi *= 0
@@ -160,7 +162,9 @@ class FEM_structure:
         for beam_element in self.beam_elements:
             self.fi = beam_element.beam_internal_forces(displacement,self.coords_current,self.fi)
 
-        
+    
+
+    
     def solve(
         self,
         fe=None,                    #external force vector for each DOF (length is self.N), if None then zero vector is used
@@ -172,6 +176,7 @@ class FEM_structure:
         k_update=1,                 #frequency of stiffness matrix updates k_update=1 means updating every iteration.     
         I_stiffness=25,             #identity matrix stiffness addition to improve convergence
         print_info = True,          #print solver timing and convergence info
+        solver="spsolve"
     ):
         #set timing information
         start_time = time.perf_counter()
@@ -196,6 +201,18 @@ class FEM_structure:
         self.residual_norm_history = []
         converged = False
 
+        def scaling(vec, D):
+            """
+                A. Peano and R. Riccioni, Automated discretisatton error
+                control in finite element analysis. In Finite Elements m
+                the Commercial Enviror&ent (Editei by J. 26.  Robinson),
+                pp. 368-387. Robinson & Assoc., Verwood.  England (1978)
+            """
+            non_nulls = ~np.isclose(D, 0)
+            vec = vec[non_nulls]
+            D = D[non_nulls]
+            return np.sqrt((vec*np.abs(1/D))@vec)
+        
         #start of newton-raphson solver
         for iteration in range(max_iterations + 1):
             #calculate internal forces
@@ -211,16 +228,17 @@ class FEM_structure:
             
             #determine residual, add norm to history
             residual = self.fe - self.fi
+            Diagonal = self.Kbc.diagonal()
+            crisfield_test = scaling(residual[self.bc], Diagonal)/max(scaling(self.fe[self.bc], Diagonal), scaling(self.fi[self.bc], Diagonal))
             residual_norm = np.linalg.norm(residual[self.bc])
             self.residual_norm_history.append(residual_norm)
             self.iteration_history.append(iteration)
-
             #check for convergence
             #TODO: look into chrisfield convergence criteria            
             if residual_norm < tolerance:
                 if print_info:
                     print(
-                        f"Converged after {iteration} iterations. Residual: {residual_norm:.3g} N"
+                        f"Converged after {iteration} iterations. Residual: {residual_norm:.3g} N, Crisfield: {crisfield_test:.3g}"
                     )
                 converged = True
                 break
@@ -229,7 +247,7 @@ class FEM_structure:
             if iteration == max_iterations:
                 if print_info:
                     print(
-                        f"Did not converge after {max_iterations} iterations. Residual: {residual_norm:.3g} N"
+                        f"Did not converge after {max_iterations} iterations. Residual: {residual_norm:.3g} N, Crisfield: {crisfield_test:.3g}"
                     )
                 break
 
@@ -238,12 +256,21 @@ class FEM_structure:
                 self.residual_norm_history[-10:-1]
             ):
                 relax *= relax_update
+            if iteration == 200:
+                print(relax)
+            if iteration == 300:
+                print(relax)
+            if iteration == 400:
+                print(relax)
+            if iteration == 500:
+                print(relax)
 
             #TODO: add decisiom making between lsqr solver and spsolve
             #TODO: test pypardiso spsolve
 
             #solve the linear system Ku=r for u (displacement delta), use spsolve with fallback on lsqr
             t0 = time.perf_counter()
+
             with warnings.catch_warnings(record=True) as w:
                 warnings.simplefilter("always")
                 try:
@@ -258,6 +285,13 @@ class FEM_structure:
                     if print_info:
                         print(f"spsolve failed with error: {e}. Falling back to lsqr solver.")
                     displacement_delta = lsqr(self.Kbc, residual[self.bc], atol=1e-7, btol=1e-7)[0]
+            # # displacement_delta = lsqr(self.Kbc, residual[self.bc], atol=1e-7, btol=1e-7)[0]
+            # if solver == "lsqr":
+            #     displacement_delta = lsqr(self.Kbc, residual[self.bc], atol=1e-7, btol=1e-7)[0]
+            # elif solver == "spsolve":
+            #     displacement_delta = spsolve(self.Kbc, residual[self.bc])
+
+
             timings["linear_solve"] += time.perf_counter() - t0
 
             #relax displacement delta and apply step limits, then update displacement array
@@ -273,14 +307,27 @@ class FEM_structure:
         if print_info:
             #print timing information
             end_time = time.perf_counter()
-            total = end_time - start_time
-            print(f"Solver time: {total:.4f} s")
+            runtime = end_time - start_time
+            print(f"Solver time: {runtime:.4f} s")
             iters = max(1, len(self.iteration_history))
             print("Timing summary (total / per-iter) [s]:")
             for k, v in timings.items():
                 print(f"  {k:22s}: {v:.4f} / {v/iters:.6f}")
 
-        return converged
+        # self.KC0 = coo_matrix((self.__KC0v, (self.__KC0r, self.__KC0c)), shape=(self.N, self.N)).tocsc()
+        # KC0_dense = self.KC0.toarray()
+        # # Find indices of maximum value in stiffness matrix
+        # max_idx = np.unravel_index(np.argmax(np.abs(KC0_dense)), KC0_dense.shape)
+        # i, j = max_idx
+        # max_value = KC0_dense[i, j]
+        # print(f"Maximum KC0 value: {max_value:.6e} at indices ({i}, {j})")
+        for beam_element in self.beam_elements:
+            A = beam_element.prop.A
+            E = beam_element.E
+            L = beam_element.L
+            # print("beam stiffness", E*A/L)
+
+        return converged, runtime
 
     def reset(self):
         #Resets the structure to the initial conditions
