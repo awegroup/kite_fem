@@ -3,10 +3,10 @@ from kite_fem.BeamElement import BeamElement
 from pyfe3d import DOF, INT, DOUBLE, SpringData, BeamCData
 from scipy.sparse import coo_matrix, identity
 from scipy.sparse.linalg import lsqr, spsolve
+from scipy.optimize import root
 import numpy as np
 import time
 import warnings
-import pandas as pd
 
 
 class FEM_structure:
@@ -162,9 +162,47 @@ class FEM_structure:
         for beam_element in self.beam_elements:
             self.fi = beam_element.beam_internal_forces(displacement,self.coords_current,self.fi)
 
-    
+    def _residual_function(self, displacement_vec):
+        """
+        Residual function for scipy solver
+        Returns the force residual (fe - fi) for given displacement
+        """
+        # Update coordinates based on displacement
+        full_displacement = np.zeros(self.N, dtype=np.float64)
+        full_displacement[self.bc] = displacement_vec
+        
+        self.coords_rotations_current = (self.coords_rotations_init + 
+                                       self.displacement_reinit + 
+                                       full_displacement)
+        self.coords_current = self.coords_rotations_current[self.__coordmask]
+        
+        # Calculate internal forces
+        self.update_internal_forces()
+        
+        # Return residual for free DOFs only
+        residual = self.fe - self.fi
+        return residual[self.bc]
 
-    
+    def _jacobian_function(self, displacement_vec):
+        """
+        Jacobian function (stiffness matrix) for scipy solver
+        """
+        # Update coordinates (same as in residual_function)
+        full_displacement = np.zeros(self.N, dtype=np.float64)
+        full_displacement[self.bc] = displacement_vec
+        
+        self.coords_rotations_current = (self.coords_rotations_init + 
+                                       self.displacement_reinit + 
+                                       full_displacement)
+        self.coords_current = self.coords_rotations_current[self.__coordmask]
+        
+        # Update stiffness matrix
+        self.update_stiffness_matrix()
+        
+        return -self.Kbc.toarray()
+
+
+
     def solve(
         self,
         fe=None,                    #external force vector for each DOF (length is self.N), if None then zero vector is used
@@ -176,7 +214,6 @@ class FEM_structure:
         k_update=1,                 #frequency of stiffness matrix updates k_update=1 means updating every iteration.     
         I_stiffness=25,             #identity matrix stiffness addition to improve convergence
         print_info = True,          #print solver timing and convergence info
-        solver="spsolve"
     ):
         #set timing information
         start_time = time.perf_counter()
@@ -198,6 +235,7 @@ class FEM_structure:
         #set displacements to zero and clear history
         displacement = np.zeros(self.N, dtype=DOUBLE)
         self.iteration_history = []
+        self.relax_history = []
         self.residual_norm_history = []
         converged = False
 
@@ -233,7 +271,8 @@ class FEM_structure:
             residual_norm = np.linalg.norm(residual[self.bc])
             self.residual_norm_history.append(residual_norm)
             self.iteration_history.append(iteration)
-            #check for convergence
+            self.relax_history.append(relax)
+
             #TODO: look into chrisfield convergence criteria            
             if residual_norm < tolerance:
                 if print_info:
@@ -251,19 +290,11 @@ class FEM_structure:
                     )
                 break
 
-            #update relaxation factor if not converging over the last 10 steps
-            if iteration > 10 and self.residual_norm_history[-1] >= min(
-                self.residual_norm_history[-10:-1]
+            #update relaxation factor if not converging over the last 20 steps
+            if iteration > 20 and self.residual_norm_history[-1] >= min(
+                self.residual_norm_history[-20:-1]
             ):
                 relax *= relax_update
-            if iteration == 200:
-                print(relax)
-            if iteration == 300:
-                print(relax)
-            if iteration == 400:
-                print(relax)
-            if iteration == 500:
-                print(relax)
 
             #TODO: add decisiom making between lsqr solver and spsolve
             #TODO: test pypardiso spsolve
@@ -314,19 +345,136 @@ class FEM_structure:
             for k, v in timings.items():
                 print(f"  {k:22s}: {v:.4f} / {v/iters:.6f}")
 
-        # self.KC0 = coo_matrix((self.__KC0v, (self.__KC0r, self.__KC0c)), shape=(self.N, self.N)).tocsc()
-        # KC0_dense = self.KC0.toarray()
-        # # Find indices of maximum value in stiffness matrix
-        # max_idx = np.unravel_index(np.argmax(np.abs(KC0_dense)), KC0_dense.shape)
-        # i, j = max_idx
-        # max_value = KC0_dense[i, j]
-        # print(f"Maximum KC0 value: {max_value:.6e} at indices ({i}, {j})")
-        for beam_element in self.beam_elements:
-            A = beam_element.prop.A
-            E = beam_element.E
-            L = beam_element.L
-            # print("beam stiffness", E*A/L)
+        return converged, runtime
 
+    def solve_scipy(
+        self,
+        fe=None,                    #external force vector for each DOF (length is self.N), if None then zero vector is used
+        tolerance=1e-6,             #absolute convergence tolerance for residual norm [N]
+        max_iterations=100,         #maximum number of iterations
+        I_stiffness=25,             #identity matrix stiffness addition to improve convergence
+        method='hybr',              #scipy root-finding method: 'hybr', 'lm', or 'df-sane'
+        print_info=True,            #print solver timing and convergence info
+    ):
+        """
+        Solves the nonlinear FEM system using scipy.optimize.root with Jacobian.
+        
+        Uses absolute tolerance on the residual norm (not relative tolerance).
+        Convergence is checked after solver completes: ||residual|| < tolerance.
+        
+        Parameters
+        ----------
+        fe : array_like, optional
+            External force vector for each DOF. If None, zero vector is used.
+        tolerance : float
+            Absolute convergence tolerance on residual norm [N].
+            Convergence is verified when ||f(x)|| < tolerance.
+        max_iterations : int
+            Maximum number of iterations/function evaluations.
+        I_stiffness : float
+            Identity matrix stiffness addition to improve convergence.
+        method : str
+            Scipy root-finding method that uses Jacobian. Options:
+            - 'hybr': Modified Powell hybrid method (uses Jacobian, default)
+            - 'lm': Levenberg-Marquardt algorithm (uses Jacobian)
+            - 'df-sane': Derivative-free spectral method (uses Jacobian)
+        print_info : bool
+            Whether to print solver timing and convergence information.
+            
+        Returns
+        -------
+        converged : bool
+            Whether the solver converged successfully (residual < tolerance).
+        runtime : float
+            Total solver runtime in seconds.
+        """
+        # Validate method
+        valid_methods = ['hybr', 'lm', 'df-sane']
+        if method not in valid_methods:
+            raise ValueError(f"Method must be one of {valid_methods}, got '{method}'")
+        
+        #set timing information
+        start_time = time.perf_counter()
+        
+        #set external force vector to 0 if no input is given, else use input
+        if fe is None:
+            self.fe *= 0
+        else:
+            self.fe = fe
+
+        #set solver parameters
+        self.__I_stiffness = I_stiffness
+
+        #set initial guess for displacement (zero displacement)
+        displacement_init = np.zeros(np.sum(self.bc), dtype=DOUBLE)
+        
+        #clear history
+        self.iteration_history = []
+        self.residual_norm_history = []
+        
+        # Callback function to track iterations
+        def callback(x, f):
+            """Callback to store iteration history"""
+            residual_norm = np.linalg.norm(f)
+            self.iteration_history.append(len(self.iteration_history))
+            self.residual_norm_history.append(residual_norm)
+        
+        try:
+            # Set up options for scipy.optimize.root
+            options = {
+                'maxiter': max_iterations,
+            }
+            
+            # Call scipy.optimize.root with Jacobian
+            result = root(
+                fun=self._residual_function,
+                x0=displacement_init,
+                method=method,
+                jac=self._jacobian_function,
+                callback=callback,
+                options=options
+            )
+            
+            # Extract solution
+            displacement_solution = result.x
+            
+            # Update final displacement
+            displacement = np.zeros(self.N, dtype=DOUBLE)
+            displacement[self.bc] = displacement_solution
+            
+            #update current coordinates with final displacements
+            self.coords_rotations_current = self.coords_rotations_init + self.displacement_reinit + displacement
+            self.coords_current = self.coords_rotations_current[self.__coordmask]
+            
+            # Calculate final residual for reporting
+            self.update_internal_forces()
+            residual = self.fe - self.fi
+            residual_norm = np.linalg.norm(residual[self.bc])
+            
+            # Check convergence based on absolute tolerance
+            converged = residual_norm < tolerance
+            iterations = result.nfev  # number of function evaluations
+            
+            if print_info:
+                if converged:
+                    print(f"Converged after {iterations} function evaluations. Residual: {residual_norm:.3g} N")
+                else:
+                    print(f"Did not converge after {iterations} function evaluations. Residual: {residual_norm:.3g} N")
+                if not result.success:
+                    print(f"Solver message: {result.message}")
+            
+        except Exception as e:
+            if print_info:
+                print(f"scipy.optimize.root failed with error: {e}")
+            converged = False
+        
+        #calculate runtime
+        end_time = time.perf_counter()
+        runtime = end_time - start_time
+        
+        if print_info:
+            print(f"Solver time: {runtime:.4f} s")
+        
         return converged, runtime
 
     def reset(self):
@@ -343,5 +491,7 @@ class FEM_structure:
             self.spring_elements[spring_id].l0 = new_l0
         rest_lengths = np.array([spring.l0 for spring in self.spring_elements])
         return rest_lengths   
+
+
 
 
