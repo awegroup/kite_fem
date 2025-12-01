@@ -13,8 +13,10 @@ fe[(Pulleys.num_nodes-1)*6+1] = -100
 fe[(Pulleys.num_nodes-1)*6] = 50
 
 ax1,fig1 = plot_structure(Pulleys,fe=fe, plot_displacements=True,fe_magnitude=0.35,plot_2d=True)
-Pulleys.solve(fe = fe, tolerance=1e-3, max_iterations=5000, step_limit=0.3, relax_init=0.5,relax_update=0.95, k_update=1)
-ax2,fig2 = plot_structure(Pulleys, fe=fe, fe_magnitude=0.35,plot_2d=True)
+Pulleys.solve(fe = fe, tolerance=1e-8, max_iterations=5000, step_limit=0.3, relax_init=0.5,relax_update=0.95, k_update=1,I_stiffness=1)
+fi = Pulleys.fi
+res = fe-fi
+ax2,fig2 = plot_structure(Pulleys, fe=fe, fe_magnitude=0.35,plot_2d=True,plot_internal_forces=True,plot_external_forces=True)
 ax3,fig3 = plot_convergence(Pulleys)
 
 ax1.set_title("Initial Configuration")

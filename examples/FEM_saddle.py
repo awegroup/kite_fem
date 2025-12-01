@@ -137,21 +137,32 @@ initial_conditions = init_cond
 
 # Create FEM structure and solve
 SaddleForm = FEM_structure(initial_conditions, spring_matrix)
-ax1, fig1 = plot_structure(SaddleForm, plot_displacements=True)
-SaddleForm.solve(
+ax1, fig1 = plot_structure(SaddleForm, plot_displacements=False)
+# SaddleForm.solve(
+#     fe=None,
+#     max_iterations=1000,
+#     tolerance=0.1,
+#     step_limit=0.25,
+#     relax_init=0.25,
+#     relax_update=0.95,
+#     k_update=10,
+# )
+
+converged, runtime = SaddleForm.solve_scipy(
     fe=None,
-    max_iterations=1000,
-    tolerance=0.1,
-    step_limit=0.25,
-    relax_init=0.25,
-    relax_update=0.95,
-    k_update=10,
+    max_iterations=100,
+    tolerance=1e-6,
+    I_stiffness=25,
+    print_info=True,
+    method="lm"
 )
+
+
 ax2, fig2 = plot_structure(SaddleForm)
-ax3, fig3 = plot_convergence(SaddleForm)
+# ax3, fig3 = plot_convergence(SaddleForm)
 ax1.set_title("Initial Configuration")
 ax2.set_title("Deformed Configuration")
-ax3.set_title("Convergence History")
+# ax3.set_title("Convergence History")
 ax1.legend()
 ax2.legend()
 plt.show()

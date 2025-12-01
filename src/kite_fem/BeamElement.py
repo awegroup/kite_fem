@@ -1,12 +1,12 @@
 import numpy as np
 from pyfe3d.beamprop import BeamProp
-from pyfe3d import BeamC, BeamCProbe, DOF
+from pyfe3d import BeamLR, BeamLRProbe, DOF
 
 class BeamElement:
     def __init__(self, n1 : int, n2 : int, init_k_KC0 : int, N: int):
-        #initialising pyfe3d BeamC element
-        beamprobe = BeamCProbe()
-        self.beam = BeamC(beamprobe)
+        #initialising pyfe3d BeamLR element
+        beamprobe = BeamLRProbe()
+        self.beam = BeamLR(beamprobe)
         self.prop = BeamProp()
         self.beam.init_k_KC0 = init_k_KC0
         self.beam.n1 = n1
@@ -81,6 +81,9 @@ class BeamElement:
 
         self.E = EI/self.I
         self.prop.E = self.E
+
+        k = 5000
+        self.prop.A = self.L*k/self.E
 
     def set_beam_properties(self,E,A,I,L):
         self.prop.E = E

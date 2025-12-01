@@ -12,7 +12,7 @@ class SpringElement:
         self.spring.c1 = DOF * n1
         self.spring.c2 = DOF * n2
         self.update_KC0v_only = 0
-        
+        self.slack = False
     def set_spring_properties(self, l0 : float, k : float, springtype : str, i_other_pulley: int = 0):
         #setting spring properties
         self.l0 = l0 
@@ -50,7 +50,8 @@ class SpringElement:
     def update_KC0(self, KC0r : np.ndarray, KC0c : np.ndarray, KC0v : np.ndarray, coords : np.ndarray):
         #update element rotation matrix and adds contribution to global stiffness matrix
         self.__update_rotation_matrix(coords)
-        self.spring.update_KC0(KC0r, KC0c, KC0v,self.update_KC0v_only)
+        if not self.slack:
+            self.spring.update_KC0(KC0r, KC0c, KC0v,self.update_KC0v_only)
         #set flag to only update KC0v from now on
         self.update_KC0v_only = 1
         return KC0r, KC0c, KC0v
@@ -59,15 +60,15 @@ class SpringElement:
         #Set spring stiffness
         k_fi = self.k
         self.spring.kxe = self.k
-        
+        self.slack = False
         #Set noncompressive and pulley spring stiffness to zero if compressed
         unit_vector,l = self.unit_vector(coords)
         if self.springtype == "noncompressive" or self.springtype == "pulley":
             if l+l_other_pulley < (self.l0):
-                self.spring.kxe = 0.0
-                k_fi = 0.0
-
-        #calculate spring force and allign with unit vector
+                self.spring.kxe = 0*self.k
+                k_fi = 0*self.k
+                # self.slack=True
+        # calculate spring force and allign with unit vector
         f_s = k_fi * (l + l_other_pulley - self.l0)
         fi = f_s * unit_vector
 

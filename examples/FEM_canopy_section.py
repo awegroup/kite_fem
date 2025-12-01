@@ -130,7 +130,7 @@ l0 = 0
 k = 50000
 
 for n1,n2 in zip(n1s_tether,n2s_tether):
-    spring_matrix.append([n1,n2,k,c,0,"default"])
+    spring_matrix.append([n1,n2,k,c,0,"noncompressive"])
 
 #beam
 d = 0.18
@@ -138,9 +138,9 @@ p = 0.3
 
 
 for n1,n2 in zip(n1s_beam_x,n2s_beam_x):
-    beam_matrix.append([n1, n2, p, d])
+    beam_matrix.append([n1, n2, p, d,chord/nodes_per_beam])
 for n1,n2 in zip(n1s_beam_y,n2s_beam_y):
-    beam_matrix.append([n1, n2, p, d])
+    beam_matrix.append([n1, n2, p, d,span/nodes_per_beam])
 
 canopy = FEM_structure(initial_conditions=initial_conditions,spring_matrix=spring_matrix,beam_matrix=beam_matrix)
 
@@ -192,7 +192,7 @@ fez = fe[2::6]
 print(sum(fez))
 ax1,fig1 = plot_structure(canopy,fe=fe, plot_nodes=True)
 canopy.solve(fe=fe,max_iterations = 1000 ,I_stiffness=15,tolerance=5,relax_init=0.25,step_limit = 0.1)
-ax2,fig2 = plot_structure(canopy,fe=fe, plot_nodes=True)
+ax2,fig2 = plot_structure(canopy,fe=fe, plot_external_forces=True,fe_magnitude=0.5,plot_nodes=False,linewidth = [1,0.75,1,2])
 fi = canopy.fi
 fiz = fi[2::6]
 
