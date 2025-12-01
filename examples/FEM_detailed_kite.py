@@ -72,7 +72,10 @@ kite = tensionbridles(kite,canopy_nodes,offset=0.5,scale=1)
 
 ax10,fig10 = plot_structure_with_strain(kite)
 
-ax1,fig1 = plot_structure(kite,plot_nodes=True,linewidth = [1,0.75,1,3.5],plot_node_numbers=False)
+ax1,fig1 = plot_structure(kite,plot_nodes=False,linewidth = [1,0.75,1,3.5],plot_node_numbers=True)
+plt.show()
+breakpoint()
+
 ax2,fig2 = plot_structure(kite, plot_nodes=False,plot_displacements=False,solver="spsolve",e_colors = ['black', 'black', 'black', 'black'],linewidth = [1,0.75,1,3.5],plot_2d=True,plot_2d_plane="yz")
 
 
