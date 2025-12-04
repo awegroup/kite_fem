@@ -138,23 +138,14 @@ initial_conditions = init_cond
 # Create FEM structure and solve
 SaddleForm = FEM_structure(initial_conditions, spring_matrix)
 ax1, fig1 = plot_structure(SaddleForm, plot_displacements=False)
-# SaddleForm.solve(
-#     fe=None,
-#     max_iterations=1000,
-#     tolerance=0.1,
-#     step_limit=0.25,
-#     relax_init=0.25,
-#     relax_update=0.95,
-#     k_update=10,
-# )
-
-converged, runtime = SaddleForm.solve_scipy(
+SaddleForm.solve(
     fe=None,
-    max_iterations=100,
-    tolerance=1e-6,
-    I_stiffness=25,
-    print_info=True,
-    method="lm"
+    max_iterations=1000,
+    tolerance=0.1,
+    step_limit=0.25,
+    relax_init=0.25,
+    relax_update=0.95,
+    k_update=10,
 )
 
 

@@ -217,9 +217,11 @@ class FEM_structure:
         step_limit=0.2,             #maximum displacement or rotation step for each DOF per iteration (important for convergence)
         relax_init=0.5,             #initial relaxation factor to scale displacement updats
         relax_update=0.95,          #relaxation factor update if not converging
+        relax_min=0.0,              #Minimum value of the relax factor
         k_update=1,                 #frequency of stiffness matrix updates k_update=1 means updating every iteration.     
         I_stiffness=25,             #identity matrix stiffness addition to improve convergence
         print_info = True,          #print solver timing and convergence info
+
     ):
         #set timing information
         start_time = time.perf_counter()
@@ -301,7 +303,7 @@ class FEM_structure:
                 self.residual_norm_history[-20:-1]
             ):
                 relax *= relax_update
-
+            relax = max(relax,relax_min)
             #TODO: add decisiom making between lsqr solver and spsolve
             #TODO: test pypardiso spsolve
 

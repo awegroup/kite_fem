@@ -143,6 +143,7 @@ class BeamElement:
         self.beam.update_rotation_matrix(vxyi, vxyj, vxyk, coords)
     
     def update_KC0(self, KC0r : np.ndarray, KC0c : np.ndarray, KC0v : np.ndarray, coords : np.ndarray):
+        self.update_rotation_matrix(coords)
         self.beam.update_KC0(KC0r, KC0c, KC0v,self.prop,self.update_KC0v_only)
         self.update_KC0v_only = 1
         return KC0r, KC0c, KC0v
