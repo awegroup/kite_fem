@@ -20,3 +20,9 @@ def tensionbridles(kite: FEM_structure, canopy_nodes,offset,scale):
     return kite
 
 # def distributekitemass()
+def fix_nodes(kite: FEM_structure,indices):
+    for id in indices:
+        kite.bc[6 * id : 6 * id + 6] = False
+        kite.fixed[6 * id : 6 * id + 6] = True
+    return kite
+

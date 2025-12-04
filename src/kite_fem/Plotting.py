@@ -726,13 +726,20 @@ def check_element_strain(structure, print_results=True, return_data=False):
         return strain_data
 
 
-def plot_convergence(structure):
+def plot_convergence(structure,convergence_criteria="residual"):
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.plot(structure.iteration_history, structure.residual_norm_history, 'b-', label='Residual')
-    ax.set(xlabel="Iteration", ylabel="Residual [N]")
-    ax.set_ylim(0,structure.residual_norm_history[0])
-    ax.tick_params(axis='y', labelcolor='b')
+    if convergence_criteria == "crisfield":
+        ax.plot(structure.iteration_history, structure.crisfield_history, 'b-', label='Residual')
+        ax.set(xlabel="Iteration", ylabel="Crisfield parameter")
+        ax.set_ylim(0,structure.crisfield_history[0])
+        ax.tick_params(axis='y', labelcolor='b')
+    
+    elif convergence_criteria == "residual":
+        ax.plot(structure.iteration_history, structure.residual_norm_history, 'b-', label='Residual')
+        ax.set(xlabel="Iteration", ylabel="Residual [N]")
+        ax.set_ylim(0,structure.residual_norm_history[0])
+        ax.tick_params(axis='y', labelcolor='b')
     
     # Create second y-axis for relaxation factor
     ax2 = ax.twinx()

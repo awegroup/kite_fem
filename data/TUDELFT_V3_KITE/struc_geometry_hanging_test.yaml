@@ -217,7 +217,7 @@ bridle_particles:
   - [77, -0.32614, -1.977801, 10.699767]
   - [78, -0.256835, -3.148563, 10.064703]
   - [79, -0.052295, -0.910001, 3.150542]
-  - [80, -0.021095, -0.954417, 3.343036]
+  - [80, -0.021095, -0.825, 3.343036]
   - [81, 0.089481, -1.087879, 4.021786]
   - [82, 0.396111, -1.921865, 5.940081]
   - [83, 0.473306, -1.155974, 6.347061]
@@ -251,7 +251,7 @@ bridle_particles:
   - [111, -0.32614, 1.977801, 10.699767]
   - [112, -0.256835, 3.148563, 10.064703]
   - [113, -0.052295, 0.910001, 3.150542]
-  - [114, -0.021095, 0.954417, 3.343036]
+  - [114, -0.021095, 0.825, 3.343036]
   - [115, 0.089481, 1.087879, 4.021786]
   - [116, 0.396111, 1.921865, 5.940081]
   - [117, 0.473306, 1.155974, 6.347061]
@@ -338,10 +338,10 @@ bridle_connections:
   - [A3, 108, 106]
   - [A4, 73, 72]
   - [A4, 107, 106]
-  - [AI, 68, 70]
-  - [AI, 102, 104]
-  - [AII, 72, 70]
-  - [AII, 106, 104]
+  - [AI, 68, 80]
+  - [AI, 102, 114]
+  - [AII, 72, 80]
+  - [AII, 106, 114]
   # - [a5.1, 70, 71] #merge to node 70
   # - [a5.1, 104, 105] #merge to node 104
 
@@ -368,28 +368,28 @@ bridle_connections:
   # - [BR3, 119, 114]
   - [brmain 1, 81, 80]
   - [brmain 1, 115, 114]
-  - [brmain ext, 80, 79]
-  - [brmain ext, 114, 113]
+  # - [brmain ext, 80, 79]
+  # - [brmain ext, 114, 113]
   ##############################
   ### Additional ###################
   ##############################
   # front lines
-  - [AIII,70,71,80] # pulley
-  - [AIII,104,105,114] # pulley
+  - [AIII,80,71] # pulley
+  - [AIII,114,105] # pulley
   - [a5,71,53] #84
   - [a5,105,3] #118
-  - [amain,70,0]
-  - [amain,104,0]
+  # - [amain,70,0]
+  # - [amain,104,0]
 
 
   # rear lines
-  - [brmain 3,114,119,126] # pulley
-  - [brmain 3,80,85,127] # pulley
-  - [M-line,125,113,126] # pulley
-  - [M-line,125,79,127] # pulley
-  - [Steering Tape,126,0]
-  - [Power Tape,125,0]
-  - [Steering Tape,127,0]
+  - [brmain 3,114,119] # pulley
+  - [brmain 3,80,85] # pulley
+  # - [M-line,125,113,126] # pulley
+  # - [M-line,125,79,127] # pulley
+  # - [Steering Tape,126,0]
+  # - [Power Tape,125,0]
+  # - [Steering Tape,127,0]
   - [br5,119,120]
   - [br5,85,86]
 
@@ -458,11 +458,11 @@ bridle_lines:
   ### Additional ###################
   ##############################
     # front lines
-  - [AIII, 11.420, 0.005, dyneema, "pulley"]
+  - [AIII, 5.710, 0.005, dyneema, "noncompressive"]
   # - [A5, 2.782, 0.008, dyneema, "noncompressive"]
   # - [amain, 4.297, 0.02, dyneema, "noncompressive"]
   # rear lines
-  - [brmain 3, 12.168, 0.002, dyneema, "pulley"]
+  - [brmain 3, 5.537, 0.002, dyneema, "noncompressive"]
   - [M-line, 4.856, 0.005, dyneema, "pulley"]
   - [Steering Tape, 1.8, 0.005, dyneema, "noncompressive"]
   - [Power Tape, 3.335, 0.005, dyneema, "noncompressive"]

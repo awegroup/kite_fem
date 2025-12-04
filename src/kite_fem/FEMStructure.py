@@ -93,7 +93,7 @@ class FEM_structure:
             self.__init_KC0 += self.__springdata.KC0_SPARSE_SIZE
             #fixes rotational DOF's for the nodes connected by the spring
             for id in [n1, n2]:
-                self.bc[DOF * id+3 : DOF * id + 6] = True
+                self.bc[DOF * id+3 : DOF * id + 6] = False
 
     def __setup_pulley_elements(self, connectivity_matrix):
         for n1, n2, n3, k, c, l0 in connectivity_matrix:
@@ -214,6 +214,7 @@ class FEM_structure:
         fe=None,                    #external force vector for each DOF (length is self.N), if None then zero vector is used
         max_iterations=100,         #maximum number of iterations
         tolerance=1e-2,             #convergence tolerance in based on norm of residual forces (residual = fe - fi) [N]
+        convergence_criteria = "crisfield",
         step_limit=0.2,             #maximum displacement or rotation step for each DOF per iteration (important for convergence)
         relax_init=0.5,             #initial relaxation factor to scale displacement updats
         relax_update=0.95,          #relaxation factor update if not converging
@@ -221,6 +222,7 @@ class FEM_structure:
         k_update=1,                 #frequency of stiffness matrix updates k_update=1 means updating every iteration.     
         I_stiffness=25,             #identity matrix stiffness addition to improve convergence
         print_info = True,          #print solver timing and convergence info
+        
 
     ):
         #set timing information
@@ -245,6 +247,7 @@ class FEM_structure:
         self.iteration_history = []
         self.relax_history = []
         self.residual_norm_history = []
+        self.crisfield_history = []
         converged = False
 
         def scaling(vec, D):
@@ -279,10 +282,16 @@ class FEM_structure:
             residual_norm = np.linalg.norm(residual[self.bc])
             self.residual_norm_history.append(residual_norm)
             self.iteration_history.append(iteration)
+            self.crisfield_history.append(crisfield_test)
             self.relax_history.append(relax)
 
-            #TODO: look into chrisfield convergence criteria            
-            if residual_norm < tolerance:
+            if convergence_criteria == "crisfield":
+                convergence_value = crisfield_test
+            elif convergence_criteria == "residual":
+                convergence_value = residual_norm
+
+            #TODO: look into crisfield convergence criteria            
+            if convergence_value < tolerance:
                 if print_info:
                     print(
                         f"Converged after {iteration} iterations. Residual: {residual_norm:.3g} N, Crisfield: {crisfield_test:.3g}"
@@ -299,10 +308,17 @@ class FEM_structure:
                 break
 
             #update relaxation factor if not converging over the last 20 steps
-            if iteration > 20 and self.residual_norm_history[-1] >= np.min(
-                self.residual_norm_history[-20:-1]
-            ):
-                relax *= relax_update
+            if convergence_criteria == "crisfield":
+                if iteration > 20 and self.crisfield_history[-1] >= np.min(
+                    self.crisfield_history[-20:-1]
+                ):
+                    relax *= relax_update
+            elif convergence_criteria == "residual":
+                if iteration > 20 and self.residual_norm_history[-1] >= np.min(
+                    self.residual_norm_history[-20:-1]
+                ):
+                    relax *= relax_update
+
             relax = max(relax,relax_min)
             #TODO: add decisiom making between lsqr solver and spsolve
             #TODO: test pypardiso spsolve
