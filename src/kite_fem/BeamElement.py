@@ -82,7 +82,7 @@ class BeamElement:
         self.E = EI/self.I
         self.prop.E = self.E
 
-        k = 5000
+        k = 10000
         self.prop.A = self.L*k/self.E
 
     def set_beam_properties(self,E,A,I,L):

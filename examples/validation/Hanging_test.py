@@ -1,4 +1,6 @@
 from pathlib import Path
+from multiprocessing import Pool, cpu_count
+import copy
 
 from kitesim import (
     structural_kite_fem_level_2,
@@ -13,10 +15,11 @@ from kite_fem.Plotting import (
     plot_structure_with_strain,
     plot_convergence
 )
-from kite_fem.Functions import tensionbridles, fix_nodes
+from kite_fem.Functions import tensionbridles, fix_nodes,set_pressure, check_element_strain
 
 import matplotlib.pyplot as plt
 import numpy as np
+import csv
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 kite_name = "TUDELFT_V3_KITE"  
@@ -53,23 +56,26 @@ struc_geometry = load_yaml(struc_geometry_path)
 ) = read_struc_geometry_level_2_yaml.main(struc_geometry)
 
 config = {"is_with_initial_point_velocity": False}
-kite = structural_kite_fem_level_2.instantiate(
-    config,
-    struc_geometry,
-    struc_nodes,
-    kite_connectivity_arr,
-    l0_arr,
-    k_arr,
-    c_arr,
-    m_arr,
-    linktype_arr,
-    pulley_line_to_other_node_pair_dict,
-)[0]
 
-canopy_nodes = list(set([node for section in canopy_sections + strut_sections for node in section]))
-
-kite = tensionbridles(kite,canopy_nodes,offset=1,scale=0.9)
-kite = fix_nodes(kite,[0,127,126,125,70,79,80,113,114,104])
+def create_kite():
+    """Factory function to create a fresh kite instance"""
+    kite = structural_kite_fem_level_2.instantiate(
+        config,
+        struc_geometry,
+        struc_nodes,
+        kite_connectivity_arr,
+        l0_arr,
+        k_arr,
+        c_arr,
+        m_arr,
+        linktype_arr,
+        pulley_line_to_other_node_pair_dict,
+    )[0]
+    
+    canopy_nodes = list(set([node for section in canopy_sections + strut_sections for node in section]))
+    kite = tensionbridles(kite,canopy_nodes,offset=1,scale=0.9)
+    kite = fix_nodes(kite,[0,127,126,125,70,79,80,113,114,104])
+    return kite
 
 def extract_lengths_validation(kite,strut_sections):
     phi = []
@@ -104,20 +110,85 @@ def extract_lengths_validation(kite,strut_sections):
     phi.append(left)
     return phi
 
-# gravity = m_arr*10
-# fe = np.zeros(kite.N)
-# fe[2::6] = gravity 
+def loading(N,m_arr,tip_load,point_load):
+    fe = np.zeros(N)
+    gravity = m_arr*9.81
+    fe[2::6] = gravity 
+    fe[2*6+1] += tip_load*9.81
+    fe[56*6+1] += -tip_load*9.81
+    fe[27*6+2] += point_load/2*9.81
+    fe[29*6+2] += point_load/2*9.81
+    return fe
 
-# fe[2*6+1] = 50
-# fe[56*6+1] = -50
+def solve_single_case(args):
+    """Worker function to solve a single load case"""
+    pressure, tip_load, point_load, load_case = args
+    
+    # Create fresh kite instance for this process
+    kite = create_kite()
+    kite = set_pressure(kite, pressure)
+    fe = loading(kite.N, m_arr, tip_load, point_load)
+    
+    kite.solve(fe=fe, max_iterations=20000, tolerance=0.01, step_limit=.005, 
+               relax_init=.25, relax_min=0.00, relax_update=0.998, k_update=1, I_stiffness=15)
+    
+    strain_data = check_element_strain(kite, False)
+    all_strains = strain_data['spring_strains'] + strain_data['beam_strains']
+    max_strain = max(all_strains)
+    phi = extract_lengths_validation(kite, strut_sections)
+    tolerance = kite.crisfield_history[-1]
+    
+    output = phi
+    output.append(tolerance)
+    output.insert(0, load_case)
+    output.append(max_strain)
+    
+    return output
 
-# # fe[27*6+2] = 125
-# # fe[29*6+2] = 125
+def write_results(results):
+    """Write all results to CSV file"""
+    csv_path = Path(__file__).parent / "model_results.csv"
+    
+    with open(csv_path, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(["Load case",'La','Lb','Lc','Ld','Le','Lf','Lg','Lh','Li','b','LcsTL','LcsTR',"Tolerance","max strain"])
+        writer.writerows(results)
+
+if __name__ == '__main__':
+    pressures = [0.15, 0.25]
+    tip_loads = [2, 5]           #kg
+    point_loads = [9.7, 25.2]     #kg
+    
+    # Build list of all load cases
+    load_cases = []
+    load_case = 0
+    
+    for pressure in pressures:
+        # Base case (no additional loads)
+        load_case += 1
+        load_cases.append((pressure, 0, 0, load_case))
+        # Point load cases
+        for point_load in point_loads:
+            load_case += 1
+            load_cases.append((pressure, 0, point_load, load_case))
+        # Tip load cases
+        for tip_load in tip_loads:
+            load_case += 1
+            load_cases.append((pressure, tip_load, 0, load_case))
+    
+    # Run simulations in parallel
+    n_cores = cpu_count()
+    print(f"Running {len(load_cases)} load cases on {n_cores} CPU cores...")
+    
+    with Pool(processes=n_cores) as pool:
+        results = pool.map(solve_single_case, load_cases)
+    
+    # Write all results at once
+    write_results(results)
+    print("All simulations complete!")
 
 
-plot_structure(kite,plot_node_numbers=True,plot_nodes=False)
 
 
-extract_lengths_validation(kite,strut_sections)
-# kite.solve(fe=fe, max_iterations=10000, tolerance=0.01, step_limit=.005, relax_init=.25, relax_min=0.00, relax_update=0.998, k_update=1,I_stiffness=15)
-plt.show()
+
+

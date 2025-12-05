@@ -462,7 +462,7 @@ bridle_lines:
   # - [A5, 2.782, 0.008, dyneema, "noncompressive"]
   # - [amain, 4.297, 0.02, dyneema, "noncompressive"]
   # rear lines
-  - [brmain 3, 5.537, 0.002, dyneema, "noncompressive"]
+  - [brmain 3, 4.7125, 0.002, dyneema, "noncompressive"]
   - [M-line, 4.856, 0.005, dyneema, "pulley"]
   - [Steering Tape, 1.8, 0.005, dyneema, "noncompressive"]
   - [Power Tape, 3.335, 0.005, dyneema, "noncompressive"]

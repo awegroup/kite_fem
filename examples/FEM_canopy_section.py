@@ -191,7 +191,10 @@ fe = create_uniform_load(nodes_per_beam, chord, span, total_force)
 fez = fe[2::6]
 print(sum(fez))
 ax1,fig1 = plot_structure(canopy,fe=fe, plot_nodes=True)
-canopy.solve(fe=fe,max_iterations = 1000 ,I_stiffness=15,tolerance=5,relax_init=0.25,step_limit = 0.1)
+canopy.solve(fe=fe,max_iterations = 1000 ,I_stiffness=15,tolerance=0.01,relax_init=0.25,step_limit = 0.1)
+canopy.reset()
+canopy.solve(fe=fe,max_iterations = 1000 ,I_stiffness=15,tolerance=0.01,relax_init=0.25,step_limit = 0.1)
+
 ax2,fig2 = plot_structure(canopy,fe=fe, plot_external_forces=True,fe_magnitude=0.5,plot_nodes=False,linewidth = [1,0.75,1,2])
 fi = canopy.fi
 fiz = fi[2::6]

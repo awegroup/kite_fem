@@ -168,47 +168,6 @@ class FEM_structure:
         for beam_element in self.beam_elements:
             self.fi = beam_element.beam_internal_forces(displacement,self.coords_current,self.fi)
 
-    def _residual_function(self, displacement_vec):
-        """
-        Residual function for scipy solver
-        Returns the force residual (fe - fi) for given displacement
-        """
-        # Update coordinates based on displacement
-        full_displacement = np.zeros(self.N, dtype=np.float64)
-        full_displacement[self.bc] = displacement_vec
-        
-        self.coords_rotations_current = (self.coords_rotations_init + 
-                                       self.displacement_reinit + 
-                                       full_displacement)
-        self.coords_current = self.coords_rotations_current[self.__coordmask]
-        
-        # Calculate internal forces
-        self.update_internal_forces()
-        
-        # Return residual for free DOFs only
-        residual = self.fe - self.fi
-        return residual[self.bc]
-
-    def _jacobian_function(self, displacement_vec):
-        """
-        Jacobian function (stiffness matrix) for scipy solver
-        """
-        # Update coordinates (same as in residual_function)
-        full_displacement = np.zeros(self.N, dtype=np.float64)
-        full_displacement[self.bc] = displacement_vec
-        
-        self.coords_rotations_current = (self.coords_rotations_init + 
-                                       self.displacement_reinit + 
-                                       full_displacement)
-        self.coords_current = self.coords_rotations_current[self.__coordmask]
-        
-        # Update stiffness matrix
-        self.update_stiffness_matrix()
-        
-        return -self.Kbc.toarray()
-
-
-
     def solve(
         self,
         fe=None,                    #external force vector for each DOF (length is self.N), if None then zero vector is used
@@ -355,7 +314,7 @@ class FEM_structure:
             )
             
             #update current coordinates with new displacements
-            self.coords_rotations_current = self.coords_rotations_init + self.displacement_reinit + displacement
+            self.coords_rotations_current = self.coords_rotations_init + displacement
             self.coords_current = self.coords_rotations_current[self.__coordmask]
             
 
@@ -371,15 +330,13 @@ class FEM_structure:
 
         return converged, runtime
 
-
     def reset(self):
         #Resets the structure to the initial conditions
-        self.displacement_reinit *= 0
+        self.coords_current = self.coords_init
+        self.coords_rotations_current = self.coords_rotations_init
 
-    def reinitialise(self):
-        #Reinitialises the structure, such that the current displacement is the new starting point for the next solve
-        self.displacement_reinit =  self.coords_rotations_current - self.coords_rotations_init
-        
+    #TODO add save state
+
     def modify_get_spring_rest_length(self, spring_ids = [], new_l0s = []):
         #allows for modifying the rest length of a spring (usefull for power and steering lines), and returns all rest lengths
         for spring_id, new_l0 in zip(spring_ids, new_l0s):
