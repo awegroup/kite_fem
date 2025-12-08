@@ -2,6 +2,9 @@ from kite_fem.FEMStructure import FEM_structure
 import numpy as np
 from pyfe3d import DOF
 
+from kite_fem.Plotting import plot_structure,plot_structure_with_strain
+import matplotlib.pyplot as plt
+
 def tensionbridles(kite: FEM_structure, canopy_nodes,offset,scale):
     initial_conditions= kite.initial_conditions
     pulley_matrix = kite.pulley_matrix
@@ -20,10 +23,49 @@ def tensionbridles(kite: FEM_structure, canopy_nodes,offset,scale):
     kite = FEM_structure(initial_conditions_temp,spring_matrix,pulley_matrix,beam_matrix)
     return kite
 
+
+def relaxbridles(kite: FEM_structure,canopy_nodes,origin):
+    kite = fix_nodes(kite,canopy_nodes)
+    initial_conditions= kite.initial_conditions
+    pulley_matrix = kite.pulley_matrix
+    spring_matrix= kite.spring_matrix
+    beam_matrix = kite.beam_matrix
+    fe = np.zeros(kite.N)
+
+    for id in origin:
+        kite.bc[6 * id+2] = True
+        kite.fixed[6 * id+2] = False
+        fe[6*id+2] = -100
+    
+    kite.solve(fe,max_iterations=300,tolerance=0.01,print_info=False)
+    for id in origin:
+        fe[6*id+2] = -1
+    kite.solve(fe,max_iterations=300,tolerance=0.01,print_info=False)
+
+    initcoords = np.reshape(kite.coords_init, (-1, 3))
+    newcoords = np.reshape(kite.coords_current, (-1, 3))
+    
+    z_offset = newcoords[origin[0]][2] - initcoords[origin[0]][2]
+
+    initial_conditions_new = []
+    for id, (pos,vel,mass,fixed) in enumerate(initial_conditions):
+        posnew = pos.copy()
+        posnew[2] += z_offset
+        initial_conditions_new.append([pos,vel,mass,fixed])
+
+    kite = FEM_structure(initial_conditions_new,spring_matrix,pulley_matrix,beam_matrix)
+    return kite
+
 def fix_nodes(kite: FEM_structure,indices):
     for id in indices:
         kite.bc[6 * id : 6 * id + 6] = False
         kite.fixed[6 * id : 6 * id + 6] = True
+    return kite
+
+def free_nodes(kite: FEM_structure,indices):
+    for id in indices:
+        kite.bc[6 * id : 6 * id + 6] = True
+        kite.fixed[6 * id : 6 * id + 6] = False
     return kite
 
 def set_pressure(kite: FEM_structure,pressure):
@@ -195,3 +237,41 @@ def check_element_strain(structure, print_results=False):
             print(f"  Max tension: {max(tension):.2f}%")
     
     return strain_data
+
+
+def adapt_stiffnesses(structure:FEM_structure,max_stiffness = 50000):
+    #adapts stiffnesses of a converged kite structure such that springs with extensions >1% are stiffened
+    max_strain = 0
+    coords = structure.coords_current
+    for spring_element in structure.spring_elements:
+        if spring_element.springtype == "pulley":
+            length = spring_element.unit_vector(coords)[1]
+            other_element = structure.spring_elements[spring_element.i_other_pulley]
+            other_length = other_element.unit_vector(coords)[1]
+            length += other_length
+            l0 = spring_element.l0
+        else:
+            length = spring_element.unit_vector(coords)[1]
+            l0 = spring_element.l0
+        strain = (length-l0)/l0*100
+        if strain > 1:
+            spring_element.k *= 2
+            spring_element.k = min(spring_element.k,max_stiffness)
+        elif strain > 2:
+            spring_element.k *= strain
+            spring_element.k = min(spring_element.k,max_stiffness)
+        max_strain = max(max_strain,strain)
+
+    for beam_element in structure.beam_elements:
+        length = beam_element.unit_vector(coords)[1]
+        l0 = beam_element.L
+        strain = (length-l0)/l0*100
+        if strain > 1:
+            beam_element.k *= 2
+        elif strain > 2:
+            beam_element.k *= strain
+            beam_element.k = min(beam_element.k,max_stiffness)
+        max_strain = max(max_strain,strain)
+    
+    print(max_strain)
+

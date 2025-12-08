@@ -15,7 +15,7 @@ from kite_fem.Plotting import (
     plot_structure_with_strain,
     plot_convergence
 )
-from kite_fem.Functions import tensionbridles, fix_nodes,set_pressure, check_element_strain
+from kite_fem.Functions import relaxbridles, fix_nodes,set_pressure, check_element_strain, adapt_stiffnesses
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -73,8 +73,11 @@ def create_kite():
     )[0]
     
     canopy_nodes = list(set([node for section in canopy_sections + strut_sections for node in section]))
-    kite = tensionbridles(kite,canopy_nodes,offset=1,scale=0.9)
-    kite = fix_nodes(kite,[0,127,126,125,70,79,80,113,114,104])
+    kite = fix_nodes(kite,[0,129,128,127,72,81,82,115,116,106])
+    kite = fix_nodes(kite,[0,129,128,127,72,81,82,115,116,106])
+    origin =  [82,116]
+    kite = relaxbridles(kite,canopy_nodes,origin)
+    kite = fix_nodes(kite,[0,129,128,127,72,81,82,115,116,106])
     return kite
 
 def extract_lengths_validation(kite,strut_sections):
@@ -101,9 +104,12 @@ def extract_lengths_validation(kite,strut_sections):
     phi.append(span)
     #tip_leading_edge distance
     middle_idx = len(le_ids) // 2
-    middle_le_ids = [le_ids[middle_idx - 1], le_ids[middle_idx]]
-    rightids = [middle_le_ids[0],te_ids[-1]]
-    leftids = [middle_le_ids[1],te_ids[0]]
+    # For uneven length, middle_idx is the exact center
+    # Get the points on either side of the center
+    left_le_id = le_ids[middle_idx]
+    right_le_id = le_ids[middle_idx-1]
+    rightids = [right_le_id, te_ids[-1]]
+    leftids = [left_le_id, te_ids[0]]
     right = np.linalg.norm(coords[rightids[0]]-coords[rightids[1]])
     left = np.linalg.norm(coords[leftids[0]]-coords[leftids[1]])
     phi.append(right)
@@ -115,9 +121,8 @@ def loading(N,m_arr,tip_load,point_load):
     gravity = m_arr*9.81
     fe[2::6] = gravity 
     fe[2*6+1] += tip_load*9.81
-    fe[56*6+1] += -tip_load*9.81
-    fe[27*6+2] += point_load/2*9.81
-    fe[29*6+2] += point_load/2*9.81
+    fe[58*6+1] += -tip_load*9.81
+    fe[29*6+2] += point_load*9.81
     return fe
 
 def solve_single_case(args):
@@ -128,13 +133,19 @@ def solve_single_case(args):
     kite = create_kite()
     kite = set_pressure(kite, pressure)
     fe = loading(kite.N, m_arr, tip_load, point_load)
-    
-    kite.solve(fe=fe, max_iterations=20000, tolerance=0.01, step_limit=.005, 
-               relax_init=.25, relax_min=0.00, relax_update=0.998, k_update=1, I_stiffness=15)
-    
-    strain_data = check_element_strain(kite, False)
-    all_strains = strain_data['spring_strains'] + strain_data['beam_strains']
-    max_strain = max(all_strains)
+    max_strain = 100
+    iteration = 1
+    print("set up kite for case",load_case)
+    while max_strain >1 and iteration <5:
+        print("load case",load_case, "iteration",iteration)
+        kite.solve(fe=fe, max_iterations=15000, tolerance=0.01, step_limit=.005, 
+                relax_init=.25, relax_min=0.00, relax_update=0.998, k_update=1, I_stiffness=15)
+        strain_data = check_element_strain(kite, False)
+        all_strains = strain_data['spring_strains'] + strain_data['beam_strains']
+        max_strain = max(all_strains)
+        adapt_stiffnesses(kite)
+        iteration += 1
+        
     phi = extract_lengths_validation(kite, strut_sections)
     tolerance = kite.crisfield_history[-1]
     

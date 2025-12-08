@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 from pyfe3d import DOF
 from scipy.sparse.linalg import lsqr, spsolve
-from kite_fem.Functions import check_element_strain
 import numpy as np
 
 

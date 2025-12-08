@@ -317,11 +317,12 @@ class FEM_structure:
             self.coords_rotations_current = self.coords_rotations_init + displacement
             self.coords_current = self.coords_rotations_current[self.__coordmask]
             
+        # Calculate runtime
+        end_time = time.perf_counter()
+        runtime = end_time - start_time
 
         if print_info:
             #print timing information
-            end_time = time.perf_counter()
-            runtime = end_time - start_time
             print(f"Solver time: {runtime:.4f} s")
             iters = max(1, len(self.iteration_history))
             print("Timing summary (total / per-iter) [s]:")

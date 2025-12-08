@@ -17,7 +17,6 @@ class BeamElement:
 
     def set_inflatable_beam_properties(self,d,p,L):
         self.r = 0.5*d
-        self.k = 8/9
         self.A = np.pi * self.r**2
         self.I = np.pi * self.r**4 / 4.0
         self.J = self.I*2   
@@ -27,6 +26,7 @@ class BeamElement:
         self.prop.Iyy = self.I
         self.prop.Izz = self.I
         self.prop.J = self.I*2
+        self.k = 5000
         self.p = p
         self.L = L
         self.beam.length = L
@@ -77,13 +77,12 @@ class BeamElement:
 
         P = denom * (1 - np.exp(-(numer / denom) * (deflection)))
 
-        EI = P*1**3/(3*(deflection-(P*1/(self.k*self.A*self.G))))
+        EI = P*1**3/(3*(deflection-(P*1/((8/9)*self.A*self.G))))
 
         self.E = EI/self.I
         self.prop.E = self.E
 
-        k = 10000
-        self.prop.A = self.L*k/self.E
+        self.prop.A = self.L*self.k/self.E
 
     def set_beam_properties(self,E,A,I,L):
         self.prop.E = E
