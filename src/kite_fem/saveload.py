@@ -1,247 +1,8 @@
 import numpy as np
-import json
-import os
 from pathlib import Path
 
 
 def save_fem_structure(fem_structure, filepath):
-    """
-    Save a FEM_structure object to files for later reconstruction.
-    
-    This function saves:
-    1. Initial conditions and connectivity matrices (structure setup)
-    2. Current deformed state (coords_current, coords_rotations_current)
-    3. Dynamic properties (spring stiffnesses, beam E and G values)
-    
-    Parameters
-    ----------
-    fem_structure : FEM_structure
-        The FEM structure object to save
-    filepath : str or Path
-        Path to save the structure. Extension will be added automatically.
-        Creates a directory with the structure data.
-    
-    Returns
-    -------
-    str
-        Path to the saved directory
-    
-    Examples
-    --------
-    >>> save_fem_structure(fem_struct, "results/my_structure")
-    'results/my_structure'
-    """
-    # Convert to Path object and create directory
-    save_dir = Path(filepath)
-    save_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Dictionary to store metadata and list data
-    data = {}
-    
-    # ===== 1. Save initial conditions and connectivity matrices =====
-    data['initial_conditions'] = fem_structure.initial_conditions
-    
-    # Save connectivity matrices (check if they exist)
-    if fem_structure.spring_matrix is not None:
-        data['spring_matrix'] = fem_structure.spring_matrix.tolist() if isinstance(
-            fem_structure.spring_matrix, np.ndarray) else fem_structure.spring_matrix
-    else:
-        data['spring_matrix'] = None
-    
-    if fem_structure.pulley_matrix is not None:
-        data['pulley_matrix'] = fem_structure.pulley_matrix.tolist() if isinstance(
-            fem_structure.pulley_matrix, np.ndarray) else fem_structure.pulley_matrix
-    else:
-        data['pulley_matrix'] = None
-    
-    if fem_structure.beam_matrix is not None:
-        data['beam_matrix'] = fem_structure.beam_matrix.tolist() if isinstance(
-            fem_structure.beam_matrix, np.ndarray) else fem_structure.beam_matrix
-    else:
-        data['beam_matrix'] = None
-    
-    # ===== 2. Save current deformed state =====
-    # Save as numpy arrays for precision
-    np.save(save_dir / 'coords_current.npy', fem_structure.coords_current)
-    np.save(save_dir / 'coords_rotations_current.npy', fem_structure.coords_rotations_current)
-    
-    # ===== 3. Save dynamic properties =====
-    # Spring stiffnesses and rest lengths
-    spring_properties = []
-    for i, spring_elem in enumerate(fem_structure.spring_elements):
-        spring_props = {
-            'index': i,
-            'k': float(spring_elem.k),
-            'l0': float(spring_elem.l0),
-            'springtype': spring_elem.springtype,
-            'n1': int(spring_elem.spring.n1),
-            'n2': int(spring_elem.spring.n2)
-        }
-        if spring_elem.springtype == "pulley":
-            spring_props['i_other_pulley'] = int(spring_elem.i_other_pulley)
-        spring_properties.append(spring_props)
-    
-    data['spring_properties'] = spring_properties
-    
-    # Beam properties
-    beam_properties = []
-    for i, beam_elem in enumerate(fem_structure.beam_elements):
-        beam_props = {
-            'index': i,
-            'E': float(beam_elem.E) if hasattr(beam_elem, 'E') else None,
-            'G': float(beam_elem.G) if hasattr(beam_elem, 'G') else None,
-            'k': float(beam_elem.k) if hasattr(beam_elem, 'k') else None,
-            'n1': int(beam_elem.beam.n1),
-            'n2': int(beam_elem.beam.n2),
-            'length': float(beam_elem.beam.length)
-        }
-        # Save additional beam properties if available
-        if hasattr(beam_elem, 'r'):
-            beam_props['r'] = float(beam_elem.r)
-        if hasattr(beam_elem, 'p'):
-            beam_props['p'] = float(beam_elem.p)
-        if hasattr(beam_elem, 'A'):
-            beam_props['A'] = float(beam_elem.A)
-        if hasattr(beam_elem, 'I'):
-            beam_props['I'] = float(beam_elem.I)
-        if hasattr(beam_elem, 'J'):
-            beam_props['J'] = float(beam_elem.J)
-        
-        beam_properties.append(beam_props)
-    
-    data['beam_properties'] = beam_properties
-    
-    # Save number of nodes for validation
-    data['num_nodes'] = int(fem_structure.num_nodes)
-    data['N'] = int(fem_structure.N)
-    
-    # Write metadata to JSON file
-    with open(save_dir / 'structure_data.json', 'w') as f:
-        json.dump(data, f, indent=2)
-    
-    print(f"FEM structure saved to: {save_dir}")
-    return str(save_dir)
-
-
-def load_fem_structure(filepath):
-    """
-    Load a FEM_structure object from saved files.
-    
-    This function loads and reconstructs a complete FEM_structure with:
-    1. Structure setup from initial conditions and connectivity matrices
-    2. Deformed state from saved coordinates
-    3. Dynamic properties (updated spring k, beam E and G values)
-    
-    Parameters
-    ----------
-    filepath : str or Path
-        Path to the saved structure directory
-    
-    Returns
-    -------
-    FEM_structure
-        Reconstructed FEM structure object with deformed state and dynamic properties
-    
-    Examples
-    --------
-    >>> fem_struct = load_fem_structure("results/my_structure")
-    >>> # Structure is ready to use with saved deformation and properties
-    """
-    from kite_fem.FEMStructure import FEM_structure
-    
-    # Convert to Path object
-    load_dir = Path(filepath)
-    
-    if not load_dir.exists():
-        raise FileNotFoundError(f"Directory not found: {load_dir}")
-    
-    # Load metadata from JSON
-    with open(load_dir / 'structure_data.json', 'r') as f:
-        data = json.load(f)
-    
-    # ===== 1. Reconstruct FEM_structure with initial setup =====
-    initial_conditions = data['initial_conditions']
-    
-    # Convert matrices back to proper format if they exist
-    # Keep as list format since FEM_structure expects lists, not numpy arrays
-    spring_matrix = data['spring_matrix'] if data['spring_matrix'] is not None else None
-    pulley_matrix = data['pulley_matrix'] if data['pulley_matrix'] is not None else None
-    beam_matrix = data['beam_matrix'] if data['beam_matrix'] is not None else None
-    
-    # Create the FEM structure
-    fem_structure = FEM_structure(
-        initial_conditions=initial_conditions,
-        spring_matrix=spring_matrix,
-        pulley_matrix=pulley_matrix,
-        beam_matrix=beam_matrix
-    )
-    
-    # ===== 2. Load and apply deformed state =====
-    coords_current = np.load(load_dir / 'coords_current.npy')
-    coords_rotations_current = np.load(load_dir / 'coords_rotations_current.npy')
-    
-    fem_structure.coords_current = coords_current
-    fem_structure.coords_rotations_current = coords_rotations_current
-    
-    # ===== 3. Apply dynamic properties =====
-    # Update spring stiffnesses
-    for spring_data in data['spring_properties']:
-        idx = spring_data['index']
-        if idx < len(fem_structure.spring_elements):
-            spring_elem = fem_structure.spring_elements[idx]
-            spring_elem.k = spring_data['k']
-            spring_elem.l0 = spring_data['l0']
-            spring_elem.spring.kxe = spring_data['k']
-    
-    # Update beam properties
-    for beam_data in data['beam_properties']:
-        idx = beam_data['index']
-        if idx < len(fem_structure.beam_elements):
-            beam_elem = fem_structure.beam_elements[idx]
-            
-            # Update stiffness properties
-            if beam_data['E'] is not None:
-                beam_elem.E = beam_data['E']
-                beam_elem.prop.E = beam_data['E']
-            
-            if beam_data['G'] is not None:
-                beam_elem.G = beam_data['G']
-                beam_elem.prop.G = beam_data['G']
-            
-            if beam_data['k'] is not None:
-                beam_elem.k = beam_data['k']
-            
-            # Update geometric properties if available
-            if 'r' in beam_data and beam_data['r'] is not None:
-                beam_elem.r = beam_data['r']
-            if 'p' in beam_data and beam_data['p'] is not None:
-                beam_elem.p = beam_data['p']
-            if 'A' in beam_data and beam_data['A'] is not None:
-                beam_elem.A = beam_data['A']
-                beam_elem.prop.A = beam_data['A']
-            if 'I' in beam_data and beam_data['I'] is not None:
-                beam_elem.I = beam_data['I']
-                beam_elem.prop.Iyy = beam_data['I']
-                beam_elem.prop.Izz = beam_data['I']
-            if 'J' in beam_data and beam_data['J'] is not None:
-                beam_elem.J = beam_data['J']
-                beam_elem.prop.J = beam_data['J']
-    
-    # Validate loaded structure
-    if fem_structure.num_nodes != data['num_nodes']:
-        raise ValueError(
-            f"Mismatch in number of nodes: expected {data['num_nodes']}, got {fem_structure.num_nodes}"
-        )
-    
-    print(f"FEM structure loaded from: {load_dir}")
-    print(f"  Nodes: {fem_structure.num_nodes}")
-    print(f"  Spring elements: {len(fem_structure.spring_elements)}")
-    print(f"  Beam elements: {len(fem_structure.beam_elements)}")
-    
-    return fem_structure
-
-
-def save_fem_structure_simple(fem_structure, filepath):
     """
     Save a FEM_structure object to a single compressed npz file.
     
@@ -268,6 +29,8 @@ def save_fem_structure_simple(fem_structure, filepath):
     save_dict = {
         'coords_current': fem_structure.coords_current,
         'coords_rotations_current': fem_structure.coords_rotations_current,
+        'fe': fem_structure.fe,
+        'fi': fem_structure.fi,
     }
     
     # Save connectivity matrices
@@ -277,6 +40,16 @@ def save_fem_structure_simple(fem_structure, filepath):
         save_dict['pulley_matrix'] = np.array(fem_structure.pulley_matrix)
     if fem_structure.beam_matrix is not None:
         save_dict['beam_matrix'] = np.array(fem_structure.beam_matrix)
+    
+    # Save solver history
+    if hasattr(fem_structure, 'iteration_history') and fem_structure.iteration_history:
+        save_dict['iteration_history'] = np.array(fem_structure.iteration_history)
+    if hasattr(fem_structure, 'crisfield_history') and fem_structure.crisfield_history:
+        save_dict['crisfield_history'] = np.array(fem_structure.crisfield_history)
+    if hasattr(fem_structure, 'residual_norm_history') and fem_structure.residual_norm_history:
+        save_dict['residual_norm_history'] = np.array(fem_structure.residual_norm_history)
+    if hasattr(fem_structure, 'relax_history') and fem_structure.relax_history:
+        save_dict['relax_history'] = np.array(fem_structure.relax_history)
     
     # Save spring properties as arrays
     if fem_structure.spring_elements:
@@ -307,7 +80,7 @@ def save_fem_structure_simple(fem_structure, filepath):
     return str(filepath)
 
 
-def load_fem_structure_simple(filepath):
+def load_fem_structure(filepath):
     """
     Load a FEM_structure object from a compressed npz file.
     
@@ -385,6 +158,12 @@ def load_fem_structure_simple(filepath):
     fem_structure.coords_current = data['coords_current']
     fem_structure.coords_rotations_current = data['coords_rotations_current']
     
+    # Load force vectors
+    if 'fe' in data:
+        fem_structure.fe = data['fe']
+    if 'fi' in data:
+        fem_structure.fi = data['fi']
+    
     # Update spring properties
     if 'spring_k' in data:
         spring_k = data['spring_k']
@@ -407,6 +186,16 @@ def load_fem_structure_simple(filepath):
                 beam_elem.G = beam_G[i]
                 beam_elem.prop.G = beam_G[i]
                 beam_elem.k = beam_k[i]
+    
+    # Load solver history
+    if 'iteration_history' in data:
+        fem_structure.iteration_history = data['iteration_history'].tolist()
+    if 'crisfield_history' in data:
+        fem_structure.crisfield_history = data['crisfield_history'].tolist()
+    if 'residual_norm_history' in data:
+        fem_structure.residual_norm_history = data['residual_norm_history'].tolist()
+    if 'relax_history' in data:
+        fem_structure.relax_history = data['relax_history'].tolist()
     
     print(f"FEM structure loaded from: {filepath}")
     return fem_structure

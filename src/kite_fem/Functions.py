@@ -49,10 +49,10 @@ def relaxbridles(kite: FEM_structure,canopy_nodes,origin):
 
     initial_conditions_new = []
     for id, (pos,vel,mass,fixed) in enumerate(initial_conditions):
-        posnew = pos.copy()
+        posnew = newcoords[id]
         posnew[2] += z_offset
-        initial_conditions_new.append([pos,vel,mass,fixed])
-
+        initial_conditions_new.append([posnew,vel,mass,fixed])
+        
     kite = FEM_structure(initial_conditions_new,spring_matrix,pulley_matrix,beam_matrix)
     return kite
 
