@@ -124,5 +124,5 @@ for test_case in range(1,11):
     validation = validation_data[test_case-1]
     SC = shapecorrelation(results,validation)
     meanabsolutedeviation = 1/len(results) * np.sum(np.abs(results-validation))
-    print(f"Test case {test_case}: SC = {SC:.3f},Mean absolute deviation = {meanabsolutedeviation:.3f}, Tolerance = {tolerance[test_case-1]:.3f}")
+    print(f"Test case {test_case}: SC = {SC:.3f},Mean absolute deviation = {meanabsolutedeviation:.3f}")
 

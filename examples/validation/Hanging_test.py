@@ -108,7 +108,7 @@ def solve_single_case(args):
     while max_strain >1 and iteration <5:
         print("load case",load_case, "iteration",iteration)
         kite.solve(fe=fe, max_iterations=15000, tolerance=0.01, step_limit=.005, 
-                relax_init=.25, relax_min=0.00, relax_update=0.998, k_update=1, I_stiffness=15)
+                relax_init=.25, relax_min=0.00, relax_update=0.9998, k_update=1, I_stiffness=15)
         strain_data = check_element_strain(kite, False)
         all_strains = strain_data['spring_strains'] + strain_data['beam_strains']
         max_strain = max(all_strains)
@@ -144,7 +144,9 @@ def get_load_cases():
 if __name__ == '__main__':
     all_load_cases = get_load_cases()
     
-    load_cases_to_run = [1,2,3,4,5,6,7,8,9,10] #adapt to only run certain cases
+    # load_cases_to_run = [1,2,3,4,5,6,7,8,9,10] #adapt to only run certain cases
+    load_cases_to_run = [1,2,6,8] #adapt to only run certain cases
+
     # load_cases_to_run = [1] #adapt to only run certain cases
 
     load_cases = [all_load_cases[i-1] for i in load_cases_to_run]
