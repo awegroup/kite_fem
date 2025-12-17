@@ -63,9 +63,11 @@ def save_fem_structure(fem_structure, filepath):
         beam_E = np.array([b.E if hasattr(b, 'E') else 0.0 for b in fem_structure.beam_elements])
         beam_G = np.array([b.G if hasattr(b, 'G') else 0.0 for b in fem_structure.beam_elements])
         beam_k = np.array([b.k if hasattr(b, 'k') else 0.0 for b in fem_structure.beam_elements])
+        beam_collapsed = np.array([b.collapsed if hasattr(b, 'collapsed') else False for b in fem_structure.beam_elements])
         save_dict['beam_E'] = beam_E
         save_dict['beam_G'] = beam_G
         save_dict['beam_k'] = beam_k
+        save_dict['beam_collapsed'] = beam_collapsed
     
     # Convert initial conditions to array for storage
     # Store as a structured format that can be reconstructed
@@ -186,6 +188,13 @@ def load_fem_structure(filepath):
                 beam_elem.G = beam_G[i]
                 beam_elem.prop.G = beam_G[i]
                 beam_elem.k = beam_k[i]
+    
+    # Load beam collapsed states
+    if 'beam_collapsed' in data:
+        beam_collapsed = data['beam_collapsed']
+        for i, beam_elem in enumerate(fem_structure.beam_elements):
+            if i < len(beam_collapsed):
+                beam_elem.collapsed = bool(beam_collapsed[i])
     
     # Load solver history
     if 'iteration_history' in data:

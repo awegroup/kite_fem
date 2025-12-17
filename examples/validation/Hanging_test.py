@@ -144,8 +144,8 @@ def get_load_cases():
 if __name__ == '__main__':
     all_load_cases = get_load_cases()
     
-    # load_cases_to_run = [1,2,3,4,5,6,7,8,9,10] #adapt to only run certain cases
-    load_cases_to_run = [1,2,6,8] #adapt to only run certain cases
+    load_cases_to_run = [1,2,3,4,5,6,7,8,9,10] #adapt to only run certain cases
+    # load_cases_to_run = [1,2,6,8] #adapt to only run certain cases
 
     # load_cases_to_run = [1] #adapt to only run certain cases
 

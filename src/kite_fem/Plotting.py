@@ -586,3 +586,262 @@ def plot_convergence(structure,convergence_criteria="residual"):
     ax2.tick_params(axis='y', labelcolor='r')
     return ax, fig
 
+
+def plot_structure_with_collapsed_beams(
+        structure,
+        ax=None,
+        fig=None,
+        plot_nodes=True,
+        plot_node_numbers=False,
+        set_labels=True,
+        plot_2d=False,
+        plot_2d_plane='xy',
+        spring_color='black',
+        beam_color='black',
+        collapsed_beam_color='red',
+        linewidth=[1, 1, 1, 3],  # Spring, Non-compressive, Pulley, Beam
+        n_colors=['black', 'grey', 'red'],
+        n_scale=[15, 15, 15]
+):
+    """
+    Plot the FEM structure with collapsed beams highlighted in red.
+    
+    All elements are colored black by default, but beams with the 
+    collapsed property set to True are colored red.
+    
+    Parameters
+    ----------
+    structure : FEM_structure
+        The FEM structure to plot
+    ax : matplotlib axis, optional
+        Axis to plot on. If None, creates new figure
+    fig : matplotlib figure, optional
+        Figure to plot on. If None, creates new figure
+    plot_nodes : bool
+        Whether to plot nodes (default: True)
+    plot_node_numbers : bool
+        Whether to label nodes with numbers (default: False)
+    set_labels : bool
+        Whether to set legend labels (default: True)
+    plot_2d : bool
+        Whether to plot in 2D (default: False)
+    plot_2d_plane : str
+        Which plane to plot if 2D: 'xy', 'xz', or 'yz' (default: 'xy')
+    spring_color : str
+        Color for spring elements (default: 'black')
+    beam_color : str
+        Color for normal beams (default: 'black')
+    collapsed_beam_color : str
+        Color for collapsed beams (default: 'red')
+    linewidth : list
+        Line widths for [spring, non-compressive, pulley, beam]
+    n_colors : list
+        Node colors for [fixed, free, pulley]
+    n_scale : list
+        Node sizes for [fixed, free, pulley]
+        
+    Returns
+    -------
+    ax, fig : matplotlib axis and figure
+    """
+    # Validate 2D plane option
+    valid_planes = ['xy', 'xz', 'yz']
+    if plot_2d and plot_2d_plane not in valid_planes:
+        raise ValueError(f"plot_2d_plane must be one of {valid_planes}, got '{plot_2d_plane}'")
+    
+    # Helper function to get coordinates for the specified plane
+    def get_plane_coords(x, y, z, plane):
+        if plane == 'xy':
+            return x, y
+        elif plane == 'xz':
+            return x, z
+        elif plane == 'yz':
+            return y, z
+        else:
+            raise ValueError(f"Invalid plane: {plane}")
+    
+    # Helper function to get axis labels for the specified plane
+    def get_plane_labels(plane):
+        if plane == 'xy':
+            return "X", "Y"
+        elif plane == 'xz':
+            return "X", "Z"
+        elif plane == 'yz':
+            return "Y", "Z"
+        else:
+            raise ValueError(f"Invalid plane: {plane}")
+    
+    if ax is None or fig is None:
+        fig = plt.figure()
+        if plot_2d:
+            ax = fig.add_subplot(111)
+        else:
+            ax = fig.add_subplot(111, projection='3d')
+
+    # Setup element properties
+    elements = ["Spring", "Non-compressive Spring", "Pulley spring", "Beam", "Collapsed Beam"]
+    element_colors = [spring_color, spring_color, spring_color, beam_color, collapsed_beam_color]
+    linetypes = ['-', '-', '-', '-', '-']
+    element_linewidths = [linewidth[0], linewidth[1], linewidth[2], linewidth[3], linewidth[3]]
+    
+    element_dict = {element: {'color': color, 'linetype': linetype, 'linewidth': lw} 
+                    for element, color, linetype, lw in zip(elements, element_colors, linetypes, element_linewidths)}
+    
+    nodes = ["Fixed Node", "Free Node", "Pulley Node"]
+    node_dict = {node: {'color': color, 'size': s} 
+                 for node, color, s in zip(nodes, n_colors, n_scale)}
+    
+    if set_labels:
+        label_set = {
+            "Free Node": False, "Fixed Node": False, "Pulley Node": False,
+            "Spring": False, "Non-compressive Spring": False, "Pulley spring": False,
+            "Beam": False, "Collapsed Beam": False
+        }
+    else:
+        label_set = {
+            "Free Node": True, "Fixed Node": True, "Pulley Node": True,
+            "Spring": True, "Non-compressive Spring": True, "Pulley spring": True,
+            "Beam": True, "Collapsed Beam": True
+        }
+    
+    # Plot nodes
+    if plot_nodes:
+        pulley_nodes = structure.pulley_ids
+        for n in range(structure.num_nodes):
+            x = structure.coords_current[n * DOF // 2]
+            y = structure.coords_current[n * DOF // 2 + 1]
+            z = structure.coords_current[n * DOF // 2 + 2]
+            fixed = structure.fixed[n * DOF]
+            
+            if n in pulley_nodes:
+                node_type = "Pulley Node"
+            elif fixed:
+                node_type = "Fixed Node"
+            else:
+                node_type = "Free Node"
+
+            if plot_2d:
+                coord1, coord2 = get_plane_coords(x, y, z, plot_2d_plane)
+                ax.scatter(coord1, coord2,
+                          color=node_dict[node_type]['color'],
+                          s=node_dict[node_type]['size'],
+                          label=node_type if not label_set[node_type] else None,
+                          zorder=10)
+            else:
+                ax.scatter(x, y, z,
+                          color=node_dict[node_type]['color'],
+                          s=node_dict[node_type]['size'],
+                          label=node_type if not label_set[node_type] else None,
+                          zorder=10)
+            
+            label_set[node_type] = True
+            
+            if plot_node_numbers:
+                if plot_2d:
+                    ax.text(coord1, coord2, str(n), fontsize=8)
+                else:
+                    ax.text(x, y, z, str(n), fontsize=8)
+    
+    # Plot spring elements
+    for spring_element in structure.spring_elements:
+        n1 = spring_element.spring.n1
+        n2 = spring_element.spring.n2
+        x_coords = [structure.coords_current[n1 * DOF // 2], structure.coords_current[n2 * DOF // 2]]
+        y_coords = [structure.coords_current[n1 * DOF // 2 + 1], structure.coords_current[n2 * DOF // 2 + 1]]
+        z_coords = [structure.coords_current[n1 * DOF // 2 + 2], structure.coords_current[n2 * DOF // 2 + 2]]
+        
+        if spring_element.springtype == "noncompressive":
+            element_type = "Non-compressive Spring"
+        elif spring_element.springtype == "pulley":
+            element_type = "Pulley spring"
+        else:
+            element_type = "Spring"
+        
+        if plot_2d:
+            coord1_list = [get_plane_coords(x_coords[0], y_coords[0], z_coords[0], plot_2d_plane)[0],
+                          get_plane_coords(x_coords[1], y_coords[1], z_coords[1], plot_2d_plane)[0]]
+            coord2_list = [get_plane_coords(x_coords[0], y_coords[0], z_coords[0], plot_2d_plane)[1],
+                          get_plane_coords(x_coords[1], y_coords[1], z_coords[1], plot_2d_plane)[1]]
+            ax.plot(coord1_list, coord2_list,
+                   color=element_dict[element_type]['color'],
+                   linestyle=element_dict[element_type]['linetype'],
+                   linewidth=element_dict[element_type]['linewidth'],
+                   label=element_type if not label_set[element_type] else None,
+                   zorder=11)
+        else:
+            ax.plot(x_coords, y_coords, z_coords,
+                   color=element_dict[element_type]['color'],
+                   linestyle=element_dict[element_type]['linetype'],
+                   linewidth=element_dict[element_type]['linewidth'],
+                   label=element_type if not label_set[element_type] else None,
+                   zorder=11)
+        label_set[element_type] = True
+
+    # Plot beam elements - color based on collapsed status
+    for beam_element in structure.beam_elements:
+        n1 = beam_element.beam.n1
+        n2 = beam_element.beam.n2
+        x_coords = [structure.coords_current[n1 * DOF // 2], structure.coords_current[n2 * DOF // 2]]
+        y_coords = [structure.coords_current[n1 * DOF // 2 + 1], structure.coords_current[n2 * DOF // 2 + 1]]
+        z_coords = [structure.coords_current[n1 * DOF // 2 + 2], structure.coords_current[n2 * DOF // 2 + 2]]
+        
+        # Check if beam is collapsed
+        is_collapsed = hasattr(beam_element, 'collapsed') and beam_element.collapsed
+        element_type = "Collapsed Beam" if is_collapsed else "Beam"
+        
+        if plot_2d:
+            coord1_list = [get_plane_coords(x_coords[0], y_coords[0], z_coords[0], plot_2d_plane)[0],
+                          get_plane_coords(x_coords[1], y_coords[1], z_coords[1], plot_2d_plane)[0]]
+            coord2_list = [get_plane_coords(x_coords[0], y_coords[0], z_coords[0], plot_2d_plane)[1],
+                          get_plane_coords(x_coords[1], y_coords[1], z_coords[1], plot_2d_plane)[1]]
+            ax.plot(coord1_list, coord2_list,
+                   color=element_dict[element_type]['color'],
+                   linestyle=element_dict[element_type]['linetype'],
+                   linewidth=element_dict[element_type]['linewidth'],
+                   label="Collapsed Beam" if element_type == "Collapsed Beam" and not label_set[element_type] else 
+                         ("Inflatable Beam" if element_type == "Beam" and not label_set[element_type] else None),
+                   zorder=12)
+        else:
+            ax.plot(x_coords, y_coords, z_coords,
+                   color=element_dict[element_type]['color'],
+                   linestyle=element_dict[element_type]['linetype'],
+                   linewidth=element_dict[element_type]['linewidth'],
+                   label="Collapsed Beam" if element_type == "Collapsed Beam" and not label_set[element_type] else 
+                         ("Inflatable Beam" if element_type == "Beam" and not label_set[element_type] else None),
+                   zorder=12)
+        label_set[element_type] = True
+    
+    # Set axis labels
+    if plot_2d:
+        xlabel, ylabel = get_plane_labels(plot_2d_plane)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+    else:
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_zlabel("Z")
+    
+    # Set equal aspect ratio
+    if not plot_2d:
+        ax.set_box_aspect([1, 1, 1])
+    else:
+        ax.set_aspect('equal')
+    
+    # Add legend if labels were set
+    if set_labels:
+        ax.legend()
+    # Set axis properties for equal scaling
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    zlim = ax.get_zlim()
+    xmid = (xlim[0] + xlim[1]) / 2
+    ymid = (ylim[0] + ylim[1]) / 2
+    zmid = (zlim[0] + zlim[1]) / 2
+    maximum = max(xlim[1]-xlim[0], ylim[1]-ylim[0], zlim[1]-zlim[0])
+    ax.set_xlim(xmid - maximum / 2, xmid + maximum / 2)
+    ax.set_ylim(ymid - maximum / 2, ymid + maximum / 2)
+    ax.set_zlim(zmid - maximum / 2, zmid + maximum / 2)
+    ax.set_box_aspect([1, 1, 1])
+    ax.set(xlabel="x [m]", ylabel="y [m]", zlabel="z [m]")
+    
+    return ax, fig

@@ -1,5 +1,11 @@
 Fast Structural Modeling of Leading Edge Inflatable Kites
 
+![Finite Element Model of the TU Delft V3 Kite](https://github.com/awegroup/kite_fem/docs/images/kitemodel.svg)
+
+![V3 kite with shortened bridle lines under gravity load](https://github.com/awegroup/kite_fem/docs/images/hangingkite.svg)
+
+
+
 ## Installation Instructions
 
 ### Building on Linux: Fedora/RHEL
