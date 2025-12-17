@@ -1,9 +1,13 @@
-Fast Structural Modeling of Leading Edge Inflatable Kites
+# Finite Element Modelling framework for structural modelling of Leading-Edge Inflatable Kites
+- Makes use of non-compressible spring elements to represent the bridle lines, pulleys and canopy
+- Timoshenko beam elements are tuned to match the properties of inflatable beams.
 
+### Finite Element Model of the TU Delft V3 Kite
 ![Finite Element Model of the TU Delft V3 Kite](https://github.com/awegroup/kite_fem/blob/main/docs/images/kitemodel.svg)
 
-![V3 kite with shortened bridle lines under gravity load](https://github.com/awegroup/kite_fem/blob/main/docs/images/hangingkite.svg)
 
+### V3 kite with shortened bridle lines under gravity load
+![V3 kite with shortened bridle lines under gravity load](https://github.com/awegroup/kite_fem/blob/main/docs/images/hangingkite.svg)
 
 
 ## Installation Instructions
