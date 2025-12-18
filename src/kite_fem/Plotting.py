@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 from pyfe3d import DOF
 from scipy.sparse.linalg import lsqr, spsolve
+from kite_fem.Functions import extract_cross_sections
 import numpy as np
 
 
@@ -845,3 +846,13 @@ def plot_structure_with_collapsed_beams(
     ax.set(xlabel="x [m]", ylabel="y [m]", zlabel="z [m]")
     
     return ax, fig
+
+def plot_cross_sections(kite,canopy_sections):
+    projected_coords_list = extract_cross_sections(kite,canopy_sections)
+    for projected_coords in projected_coords_list:
+        fig, ax = plt.subplots()
+        ax.set_xlim(-0.1,1.1)
+        ax.set_ylim(-0.2,0.2)
+        for coords in projected_coords:
+            ax.scatter(coords[0],coords[1],color="black")
+    

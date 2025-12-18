@@ -2,26 +2,6 @@ from kite_fem.FEMStructure import FEM_structure
 import numpy as np
 from pyfe3d import DOF
 
-from kite_fem.Plotting import plot_structure,plot_structure_with_strain
-import matplotlib.pyplot as plt
-
-def tensionbridles(kite: FEM_structure, canopy_nodes,offset,scale):
-    initial_conditions= kite.initial_conditions
-    pulley_matrix = kite.pulley_matrix
-    spring_matrix= kite.spring_matrix
-    beam_matrix = kite.beam_matrix
-    initial_conditions_temp = initial_conditions.copy()
-    height = np.max(kite.coords_init[2::6])
-    for id, (pos,vel,mass,fixed) in enumerate(initial_conditions):
-        if id in canopy_nodes:
-            newpos = pos + [0,0,(scale-1)*height+offset]
-            initial_conditions_temp[id] = (newpos, vel, mass, fixed)
-        elif id and id != 0:
-            newpos = pos + [0,0,pos[2]*(scale-1)+offset]
-            initial_conditions_temp[id] = (newpos, vel, mass, fixed)
-
-    kite = FEM_structure(initial_conditions_temp,spring_matrix,pulley_matrix,beam_matrix)
-    return kite
 
 
 def relaxbridles(kite: FEM_structure,canopy_nodes,origin):
@@ -60,12 +40,6 @@ def fix_nodes(kite: FEM_structure,indices):
     for id in indices:
         kite.bc[6 * id : 6 * id + 6] = False
         kite.fixed[6 * id : 6 * id + 6] = True
-    return kite
-
-def free_nodes(kite: FEM_structure,indices):
-    for id in indices:
-        kite.bc[6 * id : 6 * id + 6] = True
-        kite.fixed[6 * id : 6 * id + 6] = False
     return kite
 
 def set_pressure(kite: FEM_structure,pressure):
@@ -273,5 +247,65 @@ def adapt_stiffnesses(structure:FEM_structure,max_stiffness = 50000):
             beam_element.k = min(beam_element.k,max_stiffness)
         max_strain = max(max_strain,strain)
     
-    print(max_strain)
+def extract_cross_sections(kite,canopy_sections):
+    canopy_sections = np.asarray(canopy_sections)
+    le_nodes = canopy_sections[:,0]
+    min_le = le_nodes[0]
+    max_le = le_nodes[-1]
+    coords = kite.coords_current.reshape(-1,3)
+    x_vectors = [] 
+    y_vectors = []
+    z_vectors = []
+
+    for le_node in le_nodes:
+        te_node = le_node+1
+        right_node = le_node-2
+        left_node = le_node+2
+        x_vector = coords[te_node]-coords[le_node]
+        x_vector = x_vector/np.linalg.norm(x_vector)
+        if right_node < min_le :
+
+            left_vector = coords[left_node] - coords[le_node]
+            right_vector = -left_vector
+        elif left_node > max_le:
+            right_vector = coords[right_node] - coords[le_node]
+            left_vector = -right_vector
+
+        else:
+            right_vector = coords[right_node] - coords[le_node]
+            left_vector = coords[left_node] - coords[le_node]
+
+        right_coords = coords[le_node] + right_vector
+        left_coords = coords[le_node] + left_vector
+        z_vector = right_coords-left_coords
+        z_vector = z_vector/np.linalg.norm(z_vector)
+
+        y_vector = -np.cross(z_vector, x_vector)
+        y_vector = y_vector / np.linalg.norm(y_vector)
+        x_vectors.append(x_vector)
+        y_vectors.append(y_vector)
+
+    projected_coords_list = []
+    for section,x_vector,y_vector in zip(canopy_sections,x_vectors,y_vectors):
+        # Project all nodes onto the xy plane
+        origin = coords[le_node]
+        
+        projected_coords = []
+        for node_id in section:
+            node_pos = coords[node_id]
+            relative_pos = node_pos - origin
+            
+            # Project onto x and y directions
+            x_proj = np.dot(relative_pos, x_vector)
+            y_proj = np.dot(relative_pos, y_vector)
+            projected_coords.append([x_proj, y_proj])
+        
+        projected_coords = np.asarray(projected_coords)
+        origin_displacement = projected_coords[0]
+        projected_coords -= origin_displacement
+        x_scale = 1.0 / projected_coords[-1][0]
+        projected_coords *= x_scale
+
+        projected_coords_list.append(projected_coords)
+    return projected_coords_list
 

@@ -26,10 +26,10 @@ class BeamElement:
         self.prop.Iyy = self.I
         self.prop.Izz = self.I
         self.prop.J = self.I*2
-        self.k = 5000
         self.p = p
         self.L = L
         self.beam.length = L
+        self.k = 5000
         EI = 100  # Initial guess
         GJ = 100  # Initial guess
         self.E = EI / self.I
@@ -153,9 +153,12 @@ class BeamElement:
         self.update_inflatable_beam_properties()
 
     def beam_internal_forces(self, displacement: np.ndarray, coords: np.ndarray,fi: np.ndarray):
+
         self.update_rotation_matrix(coords)
+
         self.beam.update_probe_ue(displacement)
         self.update_inflatable_beam_properties()
+
         self.beam.update_fint(fi,self.prop)
         return fi
         
