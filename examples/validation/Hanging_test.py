@@ -71,6 +71,8 @@ def create_kite():
         m_arr,
         linktype_arr,
         pulley_line_to_other_node_pair_dict,
+        canopy_sections,
+        strut_sections,
     )[0]
     
     canopy_nodes = list(set([node for section in canopy_sections + strut_sections for node in section]))
@@ -121,7 +123,7 @@ def solve_single_case(args):
     save_fem_structure(kite,save_path)
 
 def get_load_cases():
-    pressures = [0.15, 0.25]
+    pressures = [0.35, 0.25]
     tip_loads = [2, 5]           #kg
     point_loads = [9.7, 25.2]     #kg
     # Build list of all load cases
@@ -144,8 +146,8 @@ def get_load_cases():
 if __name__ == '__main__':
     all_load_cases = get_load_cases()
     
-    load_cases_to_run = [1,2,3,4,5,6,7,8,9,10] #adapt to only run certain cases
-    # load_cases_to_run = [1,2,6,8] #adapt to only run certain cases
+    # load_cases_to_run = [1,2,3,4,5,6,7,8,9,10] #adapt to only run certain cases
+    load_cases_to_run = [1] #adapt to only run certain cases
 
     # load_cases_to_run = [1] #adapt to only run certain cases
 
