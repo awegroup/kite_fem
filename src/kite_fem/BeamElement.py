@@ -20,6 +20,7 @@ class BeamElement:
         self.A = np.pi * self.r**2
         self.I = np.pi * self.r**4 / 4.0
         self.J = self.I*2   
+        self.k = 8/9
         self.prop.A = self.A
         self.prop.Ay = 0
         self.prop.Az = 0
@@ -29,7 +30,6 @@ class BeamElement:
         self.p = p
         self.L = L
         self.beam.length = L
-        self.k = 5000
         EI = 100  # Initial guess
         GJ = 100  # Initial guess
         self.E = EI / self.I
@@ -82,7 +82,6 @@ class BeamElement:
         self.E = EI/self.I
         self.prop.E = self.E
 
-        self.prop.A = self.L*self.k/self.E
 
     def set_beam_properties(self,E,A,I,L):
         self.prop.E = E

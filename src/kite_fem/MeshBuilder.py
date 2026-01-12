@@ -2,8 +2,6 @@
 """
 Interactive Mesh Builder for Kite FEM
 
-This tool was made using claude sonnet 4
-
 Click on points to create connections:
 - LEFT CLICK: Select points for connections
 - '1' key + 2 points: Create spring connection

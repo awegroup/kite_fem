@@ -230,21 +230,23 @@ def adapt_stiffnesses(structure:FEM_structure,max_stiffness = 50000):
         strain = (length-l0)/l0*100
         if strain > 1:
             spring_element.k *= 2
-            spring_element.k = min(spring_element.k,max_stiffness)
         elif strain > 2:
             spring_element.k *= strain
-            spring_element.k = min(spring_element.k,max_stiffness)
+        spring_element.k = min(spring_element.k,max_stiffness)
         max_strain = max(max_strain,strain)
 
     for beam_element in structure.beam_elements:
         length = beam_element.unit_vector(coords)[1]
         l0 = beam_element.L
         strain = (length-l0)/l0*100
+        E = beam_element.E
+        A = beam_element.A 
         if strain > 1:
-            beam_element.k *= 2
+            beam_element.A *= 2
         elif strain > 2:
-            beam_element.k *= strain
-            beam_element.k = min(beam_element.k,max_stiffness)
+            beam_element.A *= strain
+        max_A = max_stiffness*l0/E
+        beam_element.A = min(beam_element.A,max_A)
         max_strain = max(max_strain,strain)
     
 def extract_cross_sections(kite,canopy_sections):
@@ -309,3 +311,11 @@ def extract_cross_sections(kite,canopy_sections):
         projected_coords_list.append(projected_coords)
     return projected_coords_list
 
+def set_new_origin(kite,node):
+    coords = kite.coords_current.reshape(-1,3)
+    origin = coords[node]
+    coords -= origin
+    kite.coords_current = coords.flatten()
+
+    
+    

@@ -172,7 +172,7 @@ def plot_single_case(load_case=1, elev=10, azim=180, invert_zaxis=True):
     ax1,fig1 = plot_structure(init, plot_nodes=False,plot_displacements=False,solver="spsolve",e_colors = ['black', 'black', 'black', 'black'],linewidth = [1,0.75,1,3.5],plot_2d=True,plot_2d_plane="yz")
     ax1,fig1 = plot_structure(result, plot_nodes=False,plot_displacements=False,solver="spsolve",e_colors = ['red', 'red', 'red', 'red'],linewidth = [1,0.75,1,3.5],plot_2d=True,plot_2d_plane="yz",ax=ax1,fig=fig1)
     ax2,fig2 = plot_structure(init,fe=fe,fe_magnitude=fe_magnitude,plot_external_forces=True,plot_nodes=False,linewidth = [1,0.75,1,3.5])
-    ax3,fig3 = plot_structure(result,fe=fe,fe_magnitude=fe_magnitude,plot_external_forces=True,plot_nodes=False,linewidth = [1,0.75,1,3.5])
+    ax3,fig3 = plot_structure(result,fe=fe,fe_magnitude=fe_magnitude,plot_external_forces=False,plot_nodes=False,linewidth = [1,0.75,1,3.5])
     ax4,fig4 = plot_structure_with_strain(result)
     ax5,fig5 = plot_structure_with_collapsed_beams(result,plot_nodes=False)
     ax6,fig6 = plot_convergence(result,convergence_criteria="crisfield")
@@ -204,9 +204,9 @@ if __name__ == "__main__":
     #   - Side view: elev=0, azim=90
     #   - Default: elev=20, azim=45
     # Set invert_zaxis=True to flip the z-axis
-    # fig_composite = create_composite_view(elev=10, azim=180, invert_zaxis=True)
+    fig_composite = create_composite_view(load_cases=[1,3,5],elev=10, azim=180, invert_zaxis=True)
     # Optionally, plot a single case as well
-    load_case = 1
+    load_case = 5
     plot_single_case(load_case)
 
 
