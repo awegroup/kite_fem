@@ -464,7 +464,7 @@ bridle_lines:
   # rear lines
   - [brmain 3, 12.168, 0.002, dyneema, "pulley"]
   - [M-line, 4.856, 0.005, dyneema, "pulley"]
-  - [Steering Tape, 1.8, 0.005, dyneema, "noncompressive"]
+  - [Steering Tape, 1.6, 0.005, dyneema, "noncompressive"]
   - [Power Tape, 3.335, 0.005, dyneema, "noncompressive"]
 
   #   # front lines
