@@ -173,7 +173,7 @@ class FEM_structure:
         fe=None,                    #external force vector for each DOF (length is self.N), if None then zero vector is used
         max_iterations=100,         #maximum number of iterations
         tolerance=1e-2,             #convergence tolerance in based on norm of residual forces (residual = fe - fi) [N]
-        convergence_criteria = "crisfield",
+        convergence_criteria = "crisfield", #crisfield or residual
         step_limit=0.2,             #maximum displacement or rotation step for each DOF per iteration (important for convergence)
         relax_init=0.5,             #initial relaxation factor to scale displacement updats
         relax_update=0.95,          #relaxation factor update if not converging
@@ -335,8 +335,6 @@ class FEM_structure:
         #Resets the structure to the initial conditions
         self.coords_current = self.coords_init
         self.coords_rotations_current = self.coords_rotations_init
-
-    #TODO add save state
 
     def modify_get_spring_rest_length(self, spring_ids = [], new_l0s = []):
         #allows for modifying the rest length of a spring (usefull for power and steering lines), and returns all rest lengths
