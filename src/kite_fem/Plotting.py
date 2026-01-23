@@ -342,7 +342,7 @@ def plot_structure(
         
         # Set appropriate labels based on the selected plane
         xlabel, ylabel = get_plane_labels(plot_2d_plane)
-        ax.set(xlabel=f"{xlabel.lower()} [m]", ylabel=f"{ylabel.lower()} [m]")
+        ax.set(xlabel=f"{xlabel.lower()} (m)", ylabel=f"{ylabel.lower()} (m)")
     else:
         # For 3D plots, handle x, y, and z axes
         xlim = ax.get_xlim()
@@ -356,7 +356,7 @@ def plot_structure(
         ax.set_ylim(ymid - maximum / 2, ymid + maximum / 2)
         ax.set_zlim(zmid - maximum / 2, zmid + maximum / 2)  # type: ignore
         ax.set_box_aspect([1, 1, 1])  # type: ignore
-        ax.set(xlabel="x [m]", ylabel="y [m]", zlabel="z [m]")
+        ax.set(xlabel="x (m)", ylabel="y (m)", zlabel="z (m)")
     return ax, fig
 
 
@@ -366,7 +366,7 @@ def plot_structure_with_strain(
     fig=None,
     plot_nodes=True,
     strain_range=(-5, 5),  # Strain range for colormap in percentage
-    colormap='RdYlBu_r',     # Red-Blue colormap with clear negative/positive distinction
+    colormap='RdBu_r',     # Red-Blue colormap with clear negative/positive distinction
     show_colorbar=True,
     linewidth_base=2,      # Normal linewidth for elements
     linewidth_scale=False, # Don't scale linewidth by strain magnitude
@@ -485,7 +485,7 @@ def plot_structure_with_strain(
     # Ensure the strain range is symmetric around zero for clear negative/positive distinction
     max_abs_strain = max(abs(strain_range[0]), abs(strain_range[1]))
     symmetric_range = (-max_abs_strain, max_abs_strain)
-    norm = colors.TwoSlopeNorm(vmin=symmetric_range[0], vcenter=0, vmax=symmetric_range[1])
+    norm = colors.TwoSlopeNorm(vmin=strain_range[0], vcenter=(strain_range[0]+strain_range[1])/2, vmax=strain_range[1])
     cmap = cm.get_cmap(colormap)
     
     # Plot elements with strain-based coloring
@@ -540,14 +540,16 @@ def plot_structure_with_strain(
     ax.set_ylim(ymid - maximum / 2, ymid + maximum / 2)
     ax.set_zlim(zmid - maximum / 2, zmid + maximum / 2)
     ax.set_box_aspect([1, 1, 1])
-    ax.set(xlabel="x [m]", ylabel="y [m]", zlabel="z [m]")
-    
+    ax.set_xlabel("x (m)", fontsize=14)
+    ax.set_ylabel("y (m)", fontsize=14)
+    ax.set_zlabel("z (m)", fontsize=14)
+    ax.tick_params(axis='both', labelsize=14)
     # Add colorbar if requested
     if show_colorbar:
         mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
         cbar = plt.colorbar(mappable, ax=ax, shrink=0.8, aspect=20)
-        cbar.set_label('Strain [%]', rotation=270, labelpad=15)
-        
+        cbar.set_label('Strain (%)', rotation=270, labelpad=15,fontsize=16)
+        cbar.ax.tick_params(labelsize=16)
         # Add horizontal line at zero strain for clarity
         cbar.ax.axhline(y=0, color='black', linewidth=1.5, alpha=0.8)
     
@@ -556,9 +558,37 @@ def plot_structure_with_strain(
         max_strain = max(element_strains)
         min_strain = min(element_strains)
         avg_strain = np.mean(element_strains)
-        ax.set_title(f'Structure with Strain Visualization\n'
-                    f'Strain range: {min_strain:.1f}% to {max_strain:.1f}% (avg: {avg_strain:.1f}%)')
-    
+    #     ax.set_title(f'Structure with Strain Visualization\n'
+    #                 f'Strain range: {min_strain:.1f}% to {max_strain:.1f}% (avg: {avg_strain:.1f}%)')
+    ax.set_facecolor('#2a2a2a')
+    # Add text annotations for max and min strain locations
+    if element_strains:
+        max_idx = element_strains.index(max_strain)
+        min_idx = element_strains.index(min_strain)
+        
+        max_info = element_info[max_idx]
+        min_info = element_info[min_idx]
+        
+        # Get midpoint coordinates for max strain element
+        max_coords = max_info['coords']
+        max_x = (max_coords[0][0] + max_coords[0][1]) / 2
+        max_y = (max_coords[1][0] + max_coords[1][1]) / 2
+        max_z = (max_coords[2][0] + max_coords[2][1]) / 2
+        
+        # Get midpoint coordinates for min strain element
+        min_coords = min_info['coords']
+        min_x = (min_coords[0][0] + min_coords[0][1]) / 2
+        min_y = (min_coords[1][0] + min_coords[1][1]) / 2
+        min_z = (min_coords[2][0] + min_coords[2][1]) / 2
+        
+        # Add annotations
+        ax.text(max_x, max_y, max_z, f'Max: {max_strain:.1f}%', 
+            color='white', fontsize=10, weight='bold',
+            bbox=dict(boxstyle='round,pad=0.1', facecolor='red', alpha=0.7),
+            ha='center', va='center')
+        ax.text(min_x, min_y, min_z, f'Min: {min_strain:.1f}%', 
+            color='white', fontsize=10, weight='bold',
+            bbox=dict(boxstyle='round,pad=0.1', facecolor='blue', alpha=0.7))
     return ax, fig
 
 
@@ -585,6 +615,7 @@ def plot_convergence(structure,convergence_criteria="residual"):
     ax2.plot(structure.iteration_history, structure.relax_history, 'r-', label='Relaxation Factor')
     ax2.set_ylabel('Relaxation Factor', color='r')
     ax2.tick_params(axis='y', labelcolor='r')
+
     return ax, fig
 
 
@@ -843,7 +874,7 @@ def plot_structure_with_collapsed_beams(
     ax.set_ylim(ymid - maximum / 2, ymid + maximum / 2)
     ax.set_zlim(zmid - maximum / 2, zmid + maximum / 2)
     ax.set_box_aspect([1, 1, 1])
-    ax.set(xlabel="x [m]", ylabel="y [m]", zlabel="z [m]")
+    ax.set(xlabel="x (m)", ylabel="y (m)", zlabel="z (m)")
     
     return ax, fig
 
@@ -855,4 +886,5 @@ def plot_cross_sections(kite,canopy_sections):
         ax.set_ylim(-0.2,0.2)
         for coords in projected_coords:
             ax.scatter(coords[0],coords[1],color="black")
+            
     

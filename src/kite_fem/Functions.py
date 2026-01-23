@@ -71,7 +71,7 @@ def adapt_stiffnesses(structure:FEM_structure,max_stiffness = 50000):
     for beam_element in structure.beam_elements:
         length = beam_element.unit_vector(coords)[1]
         l0 = beam_element.L
-        strain = (length-l0)/l0*100
+        strain = abs((length-l0)/l0*100)
         E = beam_element.E
         A = beam_element.A 
         if strain > 1:

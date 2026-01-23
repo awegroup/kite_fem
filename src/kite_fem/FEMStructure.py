@@ -336,7 +336,7 @@ class FEM_structure:
         self.coords_current = self.coords_init
         self.coords_rotations_current = self.coords_rotations_init
 
-    def modify_get_spring_rest_length(self, spring_ids = [], new_l0s = []):
+    def modify_get_spring_rest_length(self, spring_ids = [], new_l0s = []): #TODO move outside of class and into functions
         #allows for modifying the rest length of a spring (usefull for power and steering lines), and returns all rest lengths
         for spring_id, new_l0 in zip(spring_ids, new_l0s):
             self.spring_elements[spring_id].l0 = new_l0
