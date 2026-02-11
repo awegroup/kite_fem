@@ -1,7 +1,7 @@
 from kite_fem.SpringElement import SpringElement
 from kite_fem.BeamElement import BeamElement
 from pyfe3d import DOF, INT, DOUBLE, SpringData, BeamCData
-from scipy.sparse import coo_matrix, identity
+from scipy.sparse import coo_matrix, identity, diags
 from scipy.sparse.linalg import lsqr, spsolve
 from scipy.optimize import root
 import numpy as np
@@ -10,14 +10,20 @@ import warnings
 
 
 class FEM_structure:
-    def __init__(self, initial_conditions, spring_matrix=None, pulley_matrix=None, beam_matrix=None):
-        #Store arrays
+    def __init__(
+        self,
+        initial_conditions,
+        spring_matrix=None,
+        pulley_matrix=None,
+        beam_matrix=None,
+    ):
+        # Store arrays
         self.initial_conditions = initial_conditions
         self.spring_matrix = spring_matrix
         self.pulley_matrix = pulley_matrix
         self.beam_matrix = beam_matrix
 
-        #Determining number of nodes,DOF's and elements      
+        # Determining number of nodes,DOF's and elements
         self.num_nodes = len(initial_conditions)
         self.N = DOF * self.num_nodes
         num_spring_elements = 0
@@ -25,20 +31,23 @@ class FEM_structure:
         if spring_matrix is not None:
             num_spring_elements += len(spring_matrix)
         if pulley_matrix is not None:
-            num_spring_elements += 2*len(pulley_matrix)
+            num_spring_elements += 2 * len(pulley_matrix)
         if beam_matrix is not None:
             num_beam_elements += len(beam_matrix)
 
-        #allocating spare arrays for stiffness matrix
+        # allocating spare arrays for stiffness matrix
         self.__springdata = SpringData()
         self.__beamdata = BeamCData()
-        array_size = (self.__springdata.KC0_SPARSE_SIZE * num_spring_elements + self.__beamdata.KC0_SPARSE_SIZE * num_beam_elements)
+        array_size = (
+            self.__springdata.KC0_SPARSE_SIZE * num_spring_elements
+            + self.__beamdata.KC0_SPARSE_SIZE * num_beam_elements
+        )
         self.__KC0r = np.zeros(array_size, dtype=INT)
         self.__KC0c = np.zeros(array_size, dtype=INT)
         self.__KC0v = np.zeros(array_size, dtype=DOUBLE)
         self.__init_KC0 = 0
 
-        #Setting up the initial conditions and elements
+        # Setting up the initial conditions and elements
         self.__setup_initial_conditions(initial_conditions)
         self.spring_elements = []
         self.beam_elements = []
@@ -49,160 +58,193 @@ class FEM_structure:
             self.__setup_pulley_elements(pulley_matrix)
         if beam_matrix is not None:
             self.__setup_beam_elements(beam_matrix)
-        #Overwriting boundary conditions from elements with fixed nodes from initial_conditions
+        # Overwriting boundary conditions from elements with fixed nodes from initial_conditions
         self.bc = np.where(self.fixed == True, False, self.bc)
 
-        #mask to extract coords array from coords_rotations array
+        # mask to extract coords array from coords_rotations array
         self.__coordmask = np.zeros(self.N, dtype=bool)
-        self.__coordmask[0::DOF] = self.__coordmask[1::DOF] = self.__coordmask[2::DOF] = True
-        #Allocating force arrays
+        self.__coordmask[0::DOF] = self.__coordmask[1::DOF] = self.__coordmask[
+            2::DOF
+        ] = True
+        # Allocating force arrays
         self.fe = np.zeros(self.N, dtype=DOUBLE)
         self.fi = np.zeros(self.N, dtype=DOUBLE)
-        #Identity matrix for stiffness improvement
+        # Identity matrix for stiffness improvement
         self.__identity_matrix = identity(self.N, format="csc")
         self.__I_stiffness = 0
 
     def __setup_initial_conditions(self, initial_conditions):
-        #sets up initial positions, velocities, masses and fixed nodes. Velocities and masses are not used, but were included to match PSS inputs (https://github.com/awegroup/Particle_System_Simulator)
+        # sets up initial positions, velocities, masses and fixed nodes. Velocities and masses are not used, but were included to match PSS inputs (https://github.com/awegroup/Particle_System_Simulator)
         self.fixed = np.zeros(self.N, dtype=bool)
         self.coords_init = np.zeros((self.num_nodes, 3), dtype=np.float64)
         self.coords_rotations_init = np.zeros((self.num_nodes, 6), dtype=np.float64)
-        #assigning all initial conditions, and setting fixed DOF's
+        # Mass diagonal for pseudo-transient regularization (x,y,z DOFs only; rotational DOFs = 0)
+        self.mass_diag = np.zeros(self.N, dtype=np.float64)
+        # assigning all initial conditions, and setting fixed DOF's
         for id, (pos, vel, mass, fixed) in enumerate(initial_conditions):
             self.coords_init[id] = pos
             self.coords_rotations_init[id] = np.concatenate([pos, [0, 0, 0]])
+            self.mass_diag[DOF * id : DOF * id + 3] = mass  # x, y, z translational DOFs
             if fixed == True:
                 self.fixed[DOF * id : DOF * id + 6] = True
-        #Initalising coords (translational DOF's) and coords_rotation (translational+rotational DOF's) flat arrays
+        # Initalising coords (translational DOF's) and coords_rotation (translational+rotational DOF's) flat arrays
         self.coords_init = self.coords_init.flatten()
         self.coords_current = self.coords_init.flatten()
         self.coords_rotations_init = self.coords_rotations_init.flatten()
         self.coords_rotations_current = self.coords_rotations_init.flatten()
-        #allocating displacement array for reinitialisation
+        # allocating displacement array for reinitialisation
         self.displacement_reinit = np.zeros(self.N, dtype=DOUBLE)
-        #Initialising boundary conditions array (True = free DOF, False = fixed DOF)
+        # Initialising boundary conditions array (True = free DOF, False = fixed DOF)
         self.bc = np.ones(self.N, dtype=bool)
 
     def __setup_spring_elements(self, connectivity_matrix):
         for n1, n2, k, c, l0, springtype in connectivity_matrix:
-            #initialise spring element and assign properties
+            # initialise spring element and assign properties
             spring_element = SpringElement(n1, n2, self.__init_KC0)
             spring_element.set_spring_properties(l0, k, springtype)
             self.spring_elements.append(spring_element)
-            #update index for sparse stiffness matrix (required for pyfe3d)
+            # update index for sparse stiffness matrix (required for pyfe3d)
             self.__init_KC0 += self.__springdata.KC0_SPARSE_SIZE
-            #fixes rotational DOF's for the nodes connected by the spring
+            # fixes rotational DOF's for the nodes connected by the spring
             for id in [n1, n2]:
-                self.bc[DOF * id+3 : DOF * id + 6] = False
+                self.bc[DOF * id + 3 : DOF * id + 6] = False
 
     def __setup_pulley_elements(self, connectivity_matrix):
         for n1, n2, n3, k, c, l0 in connectivity_matrix:
-            #initialise pulley as two spring elements
+            # initialise pulley as two spring elements
             i_other_pulley = len(self.spring_elements) + 1
             spring_element = SpringElement(n1, n2, self.__init_KC0)
-            #first spring gets the index of the second spring to later access its length
+            # first spring gets the index of the second spring to later access its length
             spring_element.set_spring_properties(l0, k, "pulley", i_other_pulley)
             self.spring_elements.append(spring_element)
             i_other_pulley -= 1
             self.__init_KC0 += self.__springdata.KC0_SPARSE_SIZE
             spring_element = SpringElement(n2, n3, self.__init_KC0)
-            #second spring gets the index of the second spring to later access its length
+            # second spring gets the index of the second spring to later access its length
             spring_element.set_spring_properties(l0, k, "pulley", i_other_pulley)
             self.spring_elements.append(spring_element)
-            #update index for sparse stiffness matrix (required for pyfe3d)
+            # update index for sparse stiffness matrix (required for pyfe3d)
             self.__init_KC0 += self.__springdata.KC0_SPARSE_SIZE
-            #fixes rotational DOF's for the nodes connected by the springs
+            # fixes rotational DOF's for the nodes connected by the springs
             self.pulley_ids.append(n2)
             for id in [n1, n2, n3]:
-                self.bc[DOF * id+3 : DOF * id + 6] = False
-                
-    def __setup_beam_elements(self, connectivity_matrix): #TODO move L to connectivity matrix
+                self.bc[DOF * id + 3 : DOF * id + 6] = False
+
+    def __setup_beam_elements(
+        self, connectivity_matrix
+    ):  # TODO move L to connectivity matrix
         for n1, n2, d, p, l0 in connectivity_matrix:
-            #initialise beam element and assign properties
-            beam_element = BeamElement(n1, n2, self.__init_KC0,self.N)
-            beam_element.set_inflatable_beam_properties(d,p,l0)
+            # initialise beam element and assign properties
+            beam_element = BeamElement(n1, n2, self.__init_KC0, self.N)
+            beam_element.set_inflatable_beam_properties(d, p, l0)
             self.beam_elements.append(beam_element)
-            #update index for sparse stiffness matrix (required for pyfe3d)
+            # update index for sparse stiffness matrix (required for pyfe3d)
             self.__init_KC0 += self.__beamdata.KC0_SPARSE_SIZE
-            #frees all DOF's for the nodes connected by the beam (overwrites fixed DOF's from spring elements)
+            # frees all DOF's for the nodes connected by the beam (overwrites fixed DOF's from spring elements)
             for id in [n1, n2]:
-                self.bc[DOF * id+3 : DOF * id + 6] = True
-        
+                self.bc[DOF * id + 3 : DOF * id + 6] = True
+
     def update_stiffness_matrix(self):
         self.__KC0v *= 0
-        #Update stiffness matrix due to spring elements
+        # Update stiffness matrix due to spring elements
         for spring_element in self.spring_elements:
-            self.__KC0r, self.__KC0c, self.__KC0v = spring_element.update_KC0(self.__KC0r, self.__KC0c, self.__KC0v, self.coords_current)
-        #Update stiffness matrix due to beam elements
+            self.__KC0r, self.__KC0c, self.__KC0v = spring_element.update_KC0(
+                self.__KC0r, self.__KC0c, self.__KC0v, self.coords_current
+            )
+        # Update stiffness matrix due to beam elements
         for beam_element in self.beam_elements:
-            self.__KC0r, self.__KC0c, self.__KC0v = beam_element.update_KC0(self.__KC0r, self.__KC0c, self.__KC0v, self.coords_current)
+            self.__KC0r, self.__KC0c, self.__KC0v = beam_element.update_KC0(
+                self.__KC0r, self.__KC0c, self.__KC0v, self.coords_current
+            )
         # if np.count_nonzero(np.isnan(self.__KC0v)) > 0:
         #     raise ValueError("NaN detected in stiffness matrix")
-        
-        # Assemble global stiffness matrix        
-        self.KC0 = coo_matrix((self.__KC0v, (self.__KC0r, self.__KC0c)), shape=(self.N, self.N)).tocsc()
-        # Add identity matrix to improve convergence, this adds stiffness in each DOF
-        self.KC0 += self.__identity_matrix*self.__I_stiffness
-        # Extract matrix for free DOF's
-        self.Kbc= self.KC0[self.bc, :][:, self.bc]
 
-    
+        # Assemble global stiffness matrix
+        self.KC0 = coo_matrix(
+            (self.__KC0v, (self.__KC0r, self.__KC0c)), shape=(self.N, self.N)
+        ).tocsc()
+        # Add identity matrix to improve convergence, this adds stiffness in each DOF
+        self.KC0 += self.__identity_matrix * self.__I_stiffness
+        # Extract matrix for free DOF's
+        self.Kbc = self.KC0[self.bc, :][:, self.bc]
+
     def update_internal_forces(self):
         self.fi *= 0
-        #Add spring and pulley internal forces
+        # Add spring and pulley internal forces
         for spring_element in self.spring_elements:
-            #retrieve internal forces from spring element
+            # retrieve internal forces from spring element
             if spring_element.springtype == "pulley":
-                #add length of matching spring for pulley systems
+                # add length of matching spring for pulley systems
                 other_element = self.spring_elements[spring_element.i_other_pulley]
                 l_other_pulley = other_element.unit_vector(self.coords_current)[1]
-                fi_element = spring_element.spring_internal_forces(self.coords_current, l_other_pulley)
+                fi_element = spring_element.spring_internal_forces(
+                    self.coords_current, l_other_pulley
+                )
             else:
                 fi_element = spring_element.spring_internal_forces(self.coords_current)
-            #allocation of spring forces to nodes
-            self.fi[spring_element.spring.n1 * DOF : (spring_element.spring.n1 + 1) * DOF] -= fi_element
-            self.fi[spring_element.spring.n2 * DOF : (spring_element.spring.n2 + 1) * DOF] += fi_element
+            # allocation of spring forces to nodes
+            self.fi[
+                spring_element.spring.n1 * DOF : (spring_element.spring.n1 + 1) * DOF
+            ] -= fi_element
+            self.fi[
+                spring_element.spring.n2 * DOF : (spring_element.spring.n2 + 1) * DOF
+            ] += fi_element
 
-        #Add beam internal forces
+        # Add beam internal forces
         displacement = self.coords_rotations_current - self.coords_rotations_init
         for beam_element in self.beam_elements:
-            self.fi = beam_element.beam_internal_forces(displacement,self.coords_current,self.fi)
+            self.fi = beam_element.beam_internal_forces(
+                displacement, self.coords_current, self.fi
+            )
 
     def solve(
         self,
-        fe=None,                    #external force vector for each DOF (length is self.N), if None then zero vector is used
-        max_iterations=100,         #maximum number of iterations
-        tolerance=1e-2,             #convergence tolerance in based on norm of residual forces (residual = fe - fi) [N]
-        convergence_criteria = "crisfield", #crisfield or residual
-        step_limit=0.2,             #maximum displacement or rotation step for each DOF per iteration (important for convergence)
-        relax_init=0.5,             #initial relaxation factor to scale displacement updats
-        relax_update=0.95,          #relaxation factor update if not converging
-        relax_min=0.0,              #Minimum value of the relax factor
-        k_update=1,                 #frequency of stiffness matrix updates k_update=1 means updating every iteration.     
-        I_stiffness=25,             #identity matrix stiffness addition to improve convergence
-        print_info = True,          #print solver timing and convergence info
-        
-
+        fe=None,  # external force vector for each DOF (length is self.N), if None then zero vector is used
+        max_iterations=100,  # maximum number of iterations
+        tolerance=1e-2,  # convergence tolerance in based on norm of residual forces (residual = fe - fi) [N]
+        convergence_criteria="crisfield",  # crisfield or residual
+        step_limit=0.2,  # maximum displacement or rotation step for each DOF per iteration (important for convergence)
+        relax_init=0.5,  # initial relaxation factor to scale displacement updats
+        relax_update=0.95,  # relaxation factor update if not converging
+        relax_min=0.0,  # Minimum value of the relax factor
+        k_update=1,  # frequency of stiffness matrix updates k_update=1 means updating every iteration.
+        I_stiffness=25,  # identity matrix stiffness addition to improve convergence
+        pseudo_dt=None,  # pseudo-transient timestep for mass-proportional regularization. If set, overrides I_stiffness.
+        k_reg_min=0.0,  # minimum regularization stiffness [N/m] floor for light nodes when using pseudo_dt
+        print_info=True,  # print solver timing and convergence info
     ):
-        #set timing information
+        # set timing information
         start_time = time.perf_counter()
         timings = {
             "update_internal_forces": 0.0,
             "update_stiffness": 0.0,
             "linear_solve": 0.0,
         }
-        #set external force vector to 0 if no input is given, else use input
+        # set external force vector to 0 if no input is given, else use input
         if fe is None:
             self.fe *= 0
         else:
             self.fe = fe
 
-        #set solver parameters
+        # set solver parameters
         self.__I_stiffness = I_stiffness
         relax = relax_init
 
-        #set displacements to zero and clear history
+        # set up mass-proportional pseudo-transient regularization
+        if pseudo_dt is not None:
+            self.__I_stiffness = (
+                0  # disable uniform regularization when using mass-proportional
+            )
+            self.__k_reg = np.maximum(self.mass_diag / (pseudo_dt**2), k_reg_min)
+            self.__use_mass_reg = True
+        else:
+            self.__use_mass_reg = False
+
+        # set displacements to zero and clear history
         displacement = np.zeros(self.N, dtype=DOUBLE)
+        u_ref = (
+            displacement.copy()
+        )  # reference displacement for proximal regularization
         self.iteration_history = []
         self.relax_history = []
         self.residual_norm_history = []
@@ -211,33 +253,43 @@ class FEM_structure:
 
         def scaling(vec, D):
             """
-                A. Peano and R. Riccioni, Automated discretisatton error
-                control in finite element analysis. In Finite Elements m
-                the Commercial Enviror&ent (Editei by J. 26.  Robinson),
-                pp. 368-387. Robinson & Assoc., Verwood.  England (1978)
+            A. Peano and R. Riccioni, Automated discretisatton error
+            control in finite element analysis. In Finite Elements m
+            the Commercial Enviror&ent (Editei by J. 26.  Robinson),
+            pp. 368-387. Robinson & Assoc., Verwood.  England (1978)
             """
             non_nulls = ~np.isclose(D, 0)
             vec = vec[non_nulls]
             D = D[non_nulls]
-            return np.sqrt((vec*np.abs(1/D))@vec)
-        
-        #start of newton-raphson solver
+            return np.sqrt((vec * np.abs(1 / D)) @ vec)
+
+        # start of newton-raphson solver
         for iteration in range(max_iterations + 1):
-            #calculate internal forces
+            # calculate internal forces
             t0 = time.perf_counter()
             self.update_internal_forces()
             timings["update_internal_forces"] += time.perf_counter() - t0
-            
-            #update stiffness matrix, initially and every k_update iterations
+
+            # update stiffness matrix, initially and every k_update iterations
             if iteration % k_update == 0:
                 t0 = time.perf_counter()
                 self.update_stiffness_matrix()
                 timings["update_stiffness"] += time.perf_counter() - t0
-            
-            #determine residual, add norm to history
+
+            # determine residual, add norm to history
             residual = self.fe - self.fi
-            Diagonal = self.Kbc.diagonal()
-            crisfield_test = scaling(residual[self.bc], Diagonal)/max(scaling(self.fe[self.bc], Diagonal), scaling(self.fi[self.bc], Diagonal))
+            # apply proximal pseudo-transient regularization to residual
+            if self.__use_mass_reg:
+                residual -= self.__k_reg * (displacement - u_ref)
+            # build effective tangent matrix for linear solve (local copy to avoid cumulative mutation of self.Kbc)
+            if self.__use_mass_reg:
+                Ksolve = self.Kbc + diags(self.__k_reg[self.bc], 0, format="csc")
+            else:
+                Ksolve = self.Kbc
+            Diagonal = Ksolve.diagonal()
+            crisfield_test = scaling(residual[self.bc], Diagonal) / max(
+                scaling(self.fe[self.bc], Diagonal), scaling(self.fi[self.bc], Diagonal)
+            )
             residual_norm = np.linalg.norm(residual[self.bc])
             self.residual_norm_history.append(residual_norm)
             self.iteration_history.append(iteration)
@@ -249,7 +301,7 @@ class FEM_structure:
             elif convergence_criteria == "residual":
                 convergence_value = residual_norm
 
-            #TODO: look into crisfield convergence criteria            
+            # TODO: look into crisfield convergence criteria
             if convergence_value < tolerance:
                 if print_info:
                     print(
@@ -258,7 +310,7 @@ class FEM_structure:
                 converged = True
                 break
 
-            #check for max iterations reached
+            # check for max iterations reached
             if iteration == max_iterations:
                 if print_info:
                     print(
@@ -266,7 +318,7 @@ class FEM_structure:
                     )
                 break
 
-            #update relaxation factor if not converging over the last 20 steps
+            # update relaxation factor if not converging over the last 20 steps
             if convergence_criteria == "crisfield":
                 if iteration > 20 and self.crisfield_history[-1] >= np.min(
                     self.crisfield_history[-20:-1]
@@ -278,51 +330,58 @@ class FEM_structure:
                 ):
                     relax *= relax_update
 
-            relax = max(relax,relax_min)
-            #TODO: add decisiom making between lsqr solver and spsolve
-            #TODO: test pypardiso spsolve
+            relax = max(relax, relax_min)
+            # TODO: add decisiom making between lsqr solver and spsolve
+            # TODO: test pypardiso spsolve
 
-            #solve the linear system Ku=r for u (displacement delta), use spsolve with fallback on lsqr
+            # solve the linear system Ku=r for u (displacement delta), use spsolve with fallback on lsqr
             t0 = time.perf_counter()
 
             with warnings.catch_warnings(record=True) as w:
                 warnings.simplefilter("always")
                 try:
-                    displacement_delta = spsolve(self.Kbc, residual[self.bc])
-                    #fall back on lsqr solver if spsolve generates warnings
-                    if w:  
+                    displacement_delta = spsolve(Ksolve, residual[self.bc])
+                    # fall back on lsqr solver if spsolve generates warnings
+                    if w:
                         if print_info:
-                            print(f"spsolve generated warnings: {[warning.message for warning in w]}. Falling back to lsqr solver.")
-                        displacement_delta = lsqr(self.Kbc, residual[self.bc], atol=1e-7, btol=1e-7)[0]
+                            print(
+                                f"spsolve generated warnings: {[warning.message for warning in w]}. Falling back to lsqr solver."
+                            )
+                        displacement_delta = lsqr(
+                            Ksolve, residual[self.bc], atol=1e-7, btol=1e-7
+                        )[0]
                 except Exception as e:
-                    #fall back on lsqr solver if spsolve fails
+                    # fall back on lsqr solver if spsolve fails
                     if print_info:
-                        print(f"spsolve failed with error: {e}. Falling back to lsqr solver.")
-                    displacement_delta = lsqr(self.Kbc, residual[self.bc], atol=1e-7, btol=1e-7)[0]
+                        print(
+                            f"spsolve failed with error: {e}. Falling back to lsqr solver."
+                        )
+                    displacement_delta = lsqr(
+                        Ksolve, residual[self.bc], atol=1e-7, btol=1e-7
+                    )[0]
             # # displacement_delta = lsqr(self.Kbc, residual[self.bc], atol=1e-7, btol=1e-7)[0]
             # if solver == "lsqr":
             #     displacement_delta = lsqr(self.Kbc, residual[self.bc], atol=1e-7, btol=1e-7)[0]
             # elif solver == "spsolve":
             #     displacement_delta = spsolve(self.Kbc, residual[self.bc])
 
-
             timings["linear_solve"] += time.perf_counter() - t0
 
-            #relax displacement delta and apply step limits, then update displacement array
+            # relax displacement delta and apply step limits, then update displacement array
             displacement[self.bc] += np.clip(
                 displacement_delta * relax, -step_limit, step_limit
             )
-            
-            #update current coordinates with new displacements
+
+            # update current coordinates with new displacements
             self.coords_rotations_current = self.coords_rotations_init + displacement
             self.coords_current = self.coords_rotations_current[self.__coordmask]
-            
+
         # Calculate runtime
         end_time = time.perf_counter()
         runtime = end_time - start_time
 
         if print_info:
-            #print timing information
+            # print timing information
             print(f"Solver time: {runtime:.4f} s")
             iters = max(1, len(self.iteration_history))
             print("Timing summary (total / per-iter) [s]:")
@@ -332,17 +391,15 @@ class FEM_structure:
         return converged, runtime
 
     def reset(self):
-        #Resets the structure to the initial conditions
+        # Resets the structure to the initial conditions
         self.coords_current = self.coords_init
         self.coords_rotations_current = self.coords_rotations_init
 
-    def modify_get_spring_rest_length(self, spring_ids = [], new_l0s = []): #TODO move outside of class and into functions
-        #allows for modifying the rest length of a spring (usefull for power and steering lines), and returns all rest lengths
+    def modify_get_spring_rest_length(
+        self, spring_ids=[], new_l0s=[]
+    ):  # TODO move outside of class and into functions
+        # allows for modifying the rest length of a spring (usefull for power and steering lines), and returns all rest lengths
         for spring_id, new_l0 in zip(spring_ids, new_l0s):
             self.spring_elements[spring_id].l0 = new_l0
         rest_lengths = np.array([spring.l0 for spring in self.spring_elements])
-        return rest_lengths   
-
-
-
-
+        return rest_lengths
