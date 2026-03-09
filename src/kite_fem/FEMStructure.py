@@ -244,12 +244,13 @@ class FEM_structure:
             self.crisfield_history.append(crisfield_test)
             self.relax_history.append(relax)
 
+            #Pick convergence criteria
             if convergence_criteria == "crisfield":
                 convergence_value = crisfield_test
             elif convergence_criteria == "residual":
                 convergence_value = residual_norm
 
-            #TODO: look into crisfield convergence criteria            
+            #Check for convergence       
             if convergence_value < tolerance:
                 if print_info:
                     print(
@@ -279,8 +280,6 @@ class FEM_structure:
                     relax *= relax_update
 
             relax = max(relax,relax_min)
-            #TODO: add decisiom making between lsqr solver and spsolve
-            #TODO: test pypardiso spsolve
 
             #solve the linear system Ku=r for u (displacement delta), use spsolve with fallback on lsqr
             t0 = time.perf_counter()
@@ -299,11 +298,6 @@ class FEM_structure:
                     if print_info:
                         print(f"spsolve failed with error: {e}. Falling back to lsqr solver.")
                     displacement_delta = lsqr(self.Kbc, residual[self.bc], atol=1e-7, btol=1e-7)[0]
-            # # displacement_delta = lsqr(self.Kbc, residual[self.bc], atol=1e-7, btol=1e-7)[0]
-            # if solver == "lsqr":
-            #     displacement_delta = lsqr(self.Kbc, residual[self.bc], atol=1e-7, btol=1e-7)[0]
-            # elif solver == "spsolve":
-            #     displacement_delta = spsolve(self.Kbc, residual[self.bc])
 
 
             timings["linear_solve"] += time.perf_counter() - t0
