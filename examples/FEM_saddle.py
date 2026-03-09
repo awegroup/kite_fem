@@ -101,7 +101,7 @@ init_cond = initial_conditions(
     g_size= grid_size, m_segment = 1, fixed_nodes= f_nodes, g_h= grid_height, g_l= grid_length
 )
 
-# Create FEM structure and solve
+# Create the FEM object and solve
 SaddleForm = FEM_structure(init_cond, connections)
 ax1, fig1 = plot_structure(SaddleForm, plot_displacements=False)
 SaddleForm.solve(
@@ -115,6 +115,7 @@ SaddleForm.solve(
     convergence_criteria="residual"
 )
 
+#plot results
 ax2, fig2 = plot_structure(SaddleForm)
 ax1.set_title("Initial Configuration")
 ax2.set_title("Deformed Configuration")
