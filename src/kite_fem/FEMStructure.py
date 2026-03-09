@@ -115,10 +115,10 @@ class FEM_structure:
             for id in [n1, n2, n3]:
                 self.bc[DOF * id+3 : DOF * id + 6] = False
                 
-    def __setup_beam_elements(self, connectivity_matrix): #TODO move L to connectivity matrix
+    def __setup_beam_elements(self, connectivity_matrix): 
         for n1, n2, d, p, l0 in connectivity_matrix:
             #initialise beam element and assign properties
-            beam_element = BeamElement(n1, n2, self.__init_KC0,self.N)
+            beam_element = BeamElement(n1, n2, self.__init_KC0)
             beam_element.set_inflatable_beam_properties(d,p,l0)
             self.beam_elements.append(beam_element)
             #update index for sparse stiffness matrix (required for pyfe3d)
