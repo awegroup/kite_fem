@@ -11,7 +11,7 @@ grid_length = 10
 grid_height = 5
 
 
-def connectivity_matrix(grid_size: int, spring_stiffness: float = 1, damping_coefficient: float = 1):
+def connectivity_matrix(grid_size: int, spring_stiffness: float = 10, damping_coefficient: float = 1):
 
     n = grid_size**2 + (grid_size - 1) ** 2
     top_edge = [i for i in range(grid_size)]
