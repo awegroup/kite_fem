@@ -9,7 +9,17 @@ import warnings
 
 
 class FEM_structure:
-    def __init__(self, initial_conditions, spring_matrix=None, pulley_matrix=None, beam_matrix=None):
+    def __init__(self, 
+                initial_conditions, #Describes each node's coordinates,velocity, mass and boundary condition 
+                #Example initial_conditions = [[pos1, vel1, mass1, fixed1],[pos2, vel2, mass2, fixed]2, ... ] pos and vel are 3d vectors
+                spring_matrix=None, #Describes spring connections between two nodes, each entry is one element
+                #Example spring_matrix = [[n1, n2, k, c, l0, springtype],[n1, n2, k, c, l0, springtype], ... ]
+                pulley_matrix=None, #Describes pulley connections between three nodes, each entry turns into two spring elements
+                #Example pulley_matrix = [[n1, n2, n3, k, c, l0],[n1, n2, n3, k, c, l0], ... ]
+                beam_matrix=None, #Describes bean connections between two nodes, each entry is one element
+                #Example beam_matrix = [[n1, n2, d, p, l0],[n1, n2, d, p, l0], ... ]
+                 ):
+
         #Store arrays
         self.initial_conditions = initial_conditions
         self.spring_matrix = spring_matrix
