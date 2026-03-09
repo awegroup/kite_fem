@@ -3,7 +3,6 @@ from kite_fem.BeamElement import BeamElement
 from pyfe3d import DOF, INT, DOUBLE, SpringData, BeamCData
 from scipy.sparse import coo_matrix, identity
 from scipy.sparse.linalg import lsqr, spsolve
-from scipy.optimize import root
 import numpy as np
 import time
 import warnings
