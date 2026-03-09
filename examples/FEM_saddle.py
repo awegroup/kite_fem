@@ -5,12 +5,6 @@ import numpy as np
 
 #Input file taken from https://github.com/awegroup/Particle_System_Simulator/blob/main/examples/saddle_form/saddle_form_input.py
 
-# grid discretization
-grid_size = 11
-grid_length = 10
-grid_height = 5
-
-
 def connectivity_matrix(grid_size: int, spring_stiffness: float = 10, damping_coefficient: float = 1):
 
     n = grid_size**2 + (grid_size - 1) ** 2
@@ -96,9 +90,10 @@ def initial_conditions(
     return conditions
 
 
-
-
-
+# grid discretization
+grid_size = 11
+grid_length = 10
+grid_height = 5
 
 # instantiate connectivity matrix and initial conditions array
 connections, f_nodes = connectivity_matrix(grid_size)
@@ -120,12 +115,9 @@ SaddleForm.solve(
     convergence_criteria="residual"
 )
 
-
 ax2, fig2 = plot_structure(SaddleForm)
-# ax3, fig3 = plot_convergence(SaddleForm)
 ax1.set_title("Initial Configuration")
 ax2.set_title("Deformed Configuration")
-# ax3.set_title("Convergence History")
 ax1.legend()
 ax2.legend()
 plt.show()
