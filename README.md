@@ -103,6 +103,10 @@ sudo apt install build-essential python3-dev g++ libgomp1
     ```bash
     deactivate
     ```
+### Failed to build installable wheels for some pyproject.toml based on projects: Pyfe3D
+If the above error occurs, it means that your system does not have a c compiler installed. Follow the isntruction on:
+https://cython.readthedocs.io/en/stable/src/quickstart/install.html
+
 ### Dependencies
 - numpy
 - matplotlib>=3.7.1
