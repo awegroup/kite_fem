@@ -104,8 +104,17 @@ sudo apt install build-essential python3-dev g++ libgomp1
     deactivate
     ```
 ### Failed to build installable wheels for some pyproject.toml based on projects: Pyfe3D
-If the above error occurs, it means that your system does not have a c compiler installed. Follow the isntruction on:
-https://cython.readthedocs.io/en/stable/src/quickstart/install.html
+If the above error occurs, it means that your system does not have a c compiler installed. Follow the instruction from https://cython.readthedocs.io/en/stable/src/quickstart/install.html:
+
+    Linux The GNU C Compiler (gcc) is usually present, or easily available through the package system. On Ubuntu or Debian, for instance, it is part of the build-essential package. Next to a C compiler, Cython requires the Python header files. On Ubuntu or Debian, the command sudo apt-get install build-essential python3-dev will fetch everything you need.
+
+    Mac OS X To retrieve gcc, one option is to install Apple’s XCode, which can be retrieved from the Mac OS X’s install DVDs or from https://developer.apple.com/.
+
+    Windows The CPython project recommends building extension modules (including Cython modules) with the same compiler that Python was built with. This is usually a specific version of Microsoft Visual C/C++ (MSVC) - see https://wiki.python.org/moin/WindowsCompilers. Visual studio build tools can be found on https://gist.github.com/Mr-Precise/9967e3fcf03f2df0282b76841d2f3876 MSVC is the only compiler that Cython is currently tested with on Windows. If you’re having difficulty making setuptools detect MSVC then PyMSVC aims to solve this.
+
+    A possible alternative is the open source MinGW (a Windows distribution of gcc). See the appendix for instructions for setting up MinGW manually. Enthought Canopy and Python(x,y) bundle MinGW, but some of the configuration steps in the appendix might still be necessary.
+
+
 
 ### Dependencies
 - numpy
