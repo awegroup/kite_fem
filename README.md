@@ -117,13 +117,10 @@ A possible alternative is the open source MinGW (a Windows distribution of gcc).
 
 
 ### Dependencies
-- numpy
 - matplotlib>=3.7.1
-- seaborn
+- numpy
 - scipy
-- numba
-- ipykernel
-- screeninfo
+- pyfe3d
 
 ## Usages
 ?
