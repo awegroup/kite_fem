@@ -4,7 +4,7 @@ import copy
 
 from kitesim import (
     structural_kite_fem_level_2,
-    read_struc_geometry_level_2_yaml,
+    read_struc_geometry_yaml_level_2,
 )
 from kitesim.utils import (
     load_yaml,
@@ -54,7 +54,7 @@ struc_geometry = load_yaml(struc_geometry_path)
     linktype_arr,
     pulley_line_indices,
     pulley_line_to_other_node_pair_dict,
-) = read_struc_geometry_level_2_yaml.main(struc_geometry)
+) = read_struc_geometry_yaml_level_2.main(struc_geometry)
 
 config = {"is_with_initial_point_velocity": False}
 
