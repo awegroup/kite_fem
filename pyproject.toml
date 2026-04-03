@@ -21,13 +21,7 @@ dependencies = [
   "matplotlib",
   "numpy",
   "scipy",
-
-  # Pull pyfe3d directly from GitHub
-  # Adjust branch/tag/commit as needed:
-  #   @main            -> default branch named 'main'
-  #   @master          -> if the repo uses 'master'
-  #   @<tag-or-sha>    -> pin to a release tag or commit
-  "pyfe3d @ git+https://github.com/saullocastro/pyfe3d.git@main",
+  "pyfe3d==0.6.2",
 ]
 
 classifiers = [
